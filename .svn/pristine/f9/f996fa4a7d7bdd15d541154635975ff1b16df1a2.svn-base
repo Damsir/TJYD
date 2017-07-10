@@ -1,0 +1,37 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "2bb8b352-6258-4a40-a30c-11e417f9f09f++2359",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+    "13f79535-47bb-0310-9956-ffa450edef68++3050" : {
+      "DVTSourceControlWorkingCopyRepositoryBranchesLocationKey" : "subversion\/branches",
+      "DVTSourceControlWorkingCopyRepositoryTagsLocationKey" : "subversion\/tags",
+      "DVTSourceControlWorkingCopyRepositoryPrimaryBranchLocationKey" : "subversion\/trunk"
+    },
+    "2bb8b352-6258-4a40-a30c-11e417f9f09f++2359" : {
+
+    }
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "13f79535-47bb-0310-9956-ffa450edef68++3050" : 9223372036854775807,
+    "2bb8b352-6258-4a40-a30c-11e417f9f09f++2359" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "EF7CAF27-2A1F-4CE7-B302-5B42C7DA6298",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "13f79535-47bb-0310-9956-ffa450edef68++3050" : "..",
+    "2bb8b352-6258-4a40-a30c-11e417f9f09f++2359" : "TJYD\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "TJYD",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "TJYD.xcodeproj",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "http:\/\/svn.apache.org\/repos\/asf",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "13f79535-47bb-0310-9956-ffa450edef68++3050"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/58.246.138.178:9010\/svn\/SH2013CP002",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "2bb8b352-6258-4a40-a30c-11e417f9f09f++2359"
+    }
+  ]
+}

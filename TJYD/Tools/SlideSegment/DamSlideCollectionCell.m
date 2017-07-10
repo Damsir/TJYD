@@ -1,0 +1,39 @@
+//
+//  DamSlideCollectionCell.m
+//  GZYD
+//
+//  Created by 吴定如 on 17/2/28.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "DamSlideCollectionCell.h"
+
+#define BigSize 16.0
+#define NormalSize 16.0
+
+@implementation DamSlideCollectionCell
+
+- (void)setFontScale:(BOOL)scale{
+    
+    if (scale) {
+        // 1.3 = bigSize / normalSize
+        [UIView animateWithDuration:0.3 animations:^{
+            CGAffineTransform trans = CGAffineTransformScale(_title.transform,BigSize/NormalSize,BigSize/NormalSize);
+            [_title setTransform:trans];
+        } completion:^(BOOL finished) {
+            [_title setTransform:CGAffineTransformIdentity];
+            [_title setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:BigSize]];
+        }];
+    }else{
+        // 0.7692 = normalSize / bigSize
+        [UIView animateWithDuration:0.3 animations:^{
+            CGAffineTransform trans = CGAffineTransformScale(_title.transform,NormalSize/BigSize,NormalSize/BigSize);
+            [_title setTransform:trans];
+        } completion:^(BOOL finished) {
+            [_title setTransform:CGAffineTransformIdentity];
+            [_title setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:NormalSize]];
+        }];
+    }
+}
+
+@end

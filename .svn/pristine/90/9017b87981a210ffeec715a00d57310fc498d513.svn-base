@@ -1,0 +1,42 @@
+//
+//  SendModel.h
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/28.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import <Foundation/Foundation.h>
+
+@interface SendModel : NSObject
+
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *wfactivityid;
+@property (nonatomic, copy) NSString *Id;
+@property (nonatomic, copy) NSString *type;
+@property (nonatomic, strong) NSNumber *Override;
+@property (nonatomic, strong) NSNumber *selected;
+@property (nonatomic, strong) NSNumber *rolesend;
+@property (nonatomic, copy) NSString *groupName;
+@property (nonatomic, strong) NSNumber *multiselected;
+
+@property (nonatomic,strong) NSMutableArray *children;
+
+- (instancetype)initWithDictionary:(NSDictionary *)dic;
+
+@end
+
+@interface SendListModel : NSObject
+
+@property (nonatomic, strong) NSNumber *hasDeal;
+@property (nonatomic, copy) NSString *Id;
+@property (nonatomic, copy) NSString *loginname;
+@property (nonatomic, copy) NSString *type;
+@property (nonatomic, copy) NSString *name;
+
+@property (nonatomic, copy) NSString *isSelect;/**< 是否选中 */
+
+- (instancetype)initWithDictionary:(NSDictionary *)dic;
+
+@end
+

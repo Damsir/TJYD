@@ -1,0 +1,157 @@
+//
+//  FeedbackViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/1.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "FeedbackViewController.h"
+
+@interface FeedbackViewController () <UITextViewDelegate>
+
+@property (nonatomic,strong) UITextView *textView;
+@property (nonatomic,strong) UIButton *button;/**< 匿名 */
+@property (nonatomic,strong) UIButton *cancelButton;/**< 取消 */
+@property (nonatomic,strong) UIButton *sendButton;/**< 立即发送 */
+
+@end
+
+@implementation FeedbackViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    // 移除通知
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    self.view.backgroundColor = [UIColor whiteColor];
+    
+    [self initNavigationBarTitle:@"系统反馈"];
+    [self createFeedback];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _textView.frame = CGRectMake(20, 20, SCREEN_WIDTH-40, 215);
+    _button.frame = CGRectMake(SCREEN_WIDTH-100, CGRectGetMaxY(_textView.frame)+10, 70, 30);
+    
+    CGFloat btn_W = (SCREEN_WIDTH-50)/2;
+    _cancelButton.frame = CGRectMake(20, SCREEN_HEIGHT-64-80, btn_W, 40);
+    _sendButton.frame = CGRectMake(CGRectGetMaxX(_cancelButton.frame)+10, _cancelButton.frame.origin.y, btn_W, 40);
+
+}
+
+#pragma mark -- 意见反馈界面
+- (void)createFeedback {
+    // 意见框
+    UITextView *textView = [[UITextView alloc] init];
+    textView.frame = CGRectMake(20, 20, SCREEN_WIDTH-40, 215);
+    textView.text = @"请输入反馈内容";
+    textView.font = [UIFont systemFontOfSize:17.0];
+    
+    if ([textView.text isEqualToString:@"请输入反馈内容"])
+    {
+        textView.textColor = [UIColor lightGrayColor];
+    }
+    textView.layer.borderWidth = 1.0;
+    textView.layer.borderColor = GRAYCOLOR_MIDDLE.CGColor;
+    textView.layer.cornerRadius = 5;
+    textView.clipsToBounds = YES;
+    textView.returnKeyType = UIReturnKeyDone;
+    textView.tintColor = HOMEBLUECOLOR;
+    textView.delegate = self;
+    _textView = textView;
+    [self.view addSubview:textView];
+    
+    // 匿名按钮
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+//    button.backgroundColor = [UIColor orangeColor];
+    button.frame = CGRectMake(SCREEN_WIDTH-100, CGRectGetMaxY(textView.frame)+10, 70, 30);
+    [button setTitle:@"匿名" forState:UIControlStateNormal];
+    [button setImage:[UIImage imageNamed:@"unselect"] forState:UIControlStateNormal];
+    [button setImageEdgeInsets:UIEdgeInsetsMake(5, 0, 5, 50)];
+//    [button setTitleEdgeInsets:UIEdgeInsetsMake(0, 10, 20, 10)];
+    button.titleLabel.font = [UIFont systemFontOfSize:15.0];
+    [button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    [button addTarget:self action:@selector(buttonOnclick:) forControlEvents:UIControlEventTouchUpInside];
+    _button = button;
+    [self.view addSubview:button];
+    
+    // 取消,立即反馈
+    CGFloat btn_W = (SCREEN_WIDTH-50)/2;
+    
+    UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    cancelButton.frame = CGRectMake(20, SCREEN_HEIGHT-64-80, btn_W, 40);
+    cancelButton.layer.cornerRadius = 2;
+    cancelButton.clipsToBounds = YES;
+    [cancelButton setTitle:@"取消" forState:UIControlStateNormal];
+    cancelButton.backgroundColor = HOMEBLUECOLOR;
+    [cancelButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [cancelButton addTarget:self action:@selector(cancelOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _cancelButton = cancelButton;
+    [self.view addSubview:cancelButton];
+    
+    UIButton *sendButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    sendButton.frame = CGRectMake(CGRectGetMaxX(cancelButton.frame)+10, cancelButton.frame.origin.y, btn_W, 40);
+    sendButton.layer.cornerRadius = 2;
+    sendButton.clipsToBounds = YES;
+    [sendButton setTitle:@"立即反馈" forState:UIControlStateNormal];
+    sendButton.backgroundColor = HOMEBLUECOLOR;
+    [sendButton setTitleColor:[UIColor colorWithRed:0.020 green:0.591 blue:0.110 alpha:1.000] forState:UIControlStateNormal];
+    [sendButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [sendButton addTarget:self action:@selector(sendOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _sendButton = sendButton;
+    [self.view addSubview:sendButton];
+    
+}
+
+#pragma mark -- 匿名勾选与否
+- (void)buttonOnclick:(UIButton *)button {
+    button.selected = !button.selected;
+    if (button.selected) {
+        [button setImage:[UIImage imageNamed:@"select"] forState:UIControlStateNormal];
+    } else {
+        [button setImage:[UIImage imageNamed:@"unselect"] forState:UIControlStateNormal];
+    }
+}
+
+#pragma mark -- 取消
+- (void)cancelOnClick:(UIButton *)button {
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
+#pragma mark -- 立即反馈
+- (void)sendOnClick:(UIButton *)button {
+    
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

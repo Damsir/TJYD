@@ -1,0 +1,183 @@
+//
+//  HomeViewController.m
+//  WZYD
+//
+//  Created by 吴定如 on 16/10/21.
+//  Copyright © 2016年 dist. All rights reserved.
+//
+
+#import "HomeViewController.h"
+#import "MyProjectViewController.h"//我的项目
+#import "AdminViewController.h"//人事管理
+#import "ContactsViewController.h"//通讯录
+
+#define Button_W 80.0
+
+@interface HomeViewController ()
+
+@property(nonatomic,strong) UIView *backView;
+
+
+@property(nonatomic,strong) UIButton *todoButton;//待办事项
+@property(nonatomic,strong) UIButton *myProButton;//我的项目
+@property(nonatomic,strong) UIButton *pubAdminButton;//院内新闻
+@property(nonatomic,strong) UIButton *pubMessButton;//信息公开
+@property(nonatomic,strong) UIButton *insMessButton;//即时通讯
+@property(nonatomic,strong) UIButton *personalAdminButton;//人事管理
+@property(nonatomic,strong) UIButton *sysMessButton;//系统消息
+
+
+@end
+
+@implementation HomeViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    // 移除通知
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"TJUPDI微办公"];
+    
+    [self createHomePageButtons];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _backView.center = CGPointMake(SCREEN_WIDTH/2, (SCREEN_HEIGHT-113)/2);
+}
+
+//首页导航按钮
+-(void)createHomePageButtons
+{
+    UIView *backView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 300)];
+    backView.center = CGPointMake(SCREEN_WIDTH/2, (SCREEN_HEIGHT-113)/2);
+//    backView.backgroundColor = [UIColor orangeColor];
+    _backView = backView;
+    [self.view addSubview:backView];
+    
+    
+    CGFloat gap_h = (SCREEN_WIDTH-Button_W*3)/4;
+    CGFloat gap_v = 30.0;
+    
+    // 待办事项
+    UIButton *todoButton  = [self createButtonWithImage:@"gwbl" andTitle:@"待办事项" andFrame:CGRectMake(gap_h, 0, Button_W, Button_W) andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:101];
+    _todoButton = todoButton ;
+    [backView addSubview:_todoButton];
+    
+    // 院内新闻
+    // 行政管理
+    UIButton *pubAdminButton = [self createButtonWithImage:@"wd" andTitle:@"院内新闻" andFrame:CGRectMake(CGRectGetMaxX(_todoButton.frame)+gap_h, 0, Button_W, Button_W)andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:102];
+    _pubAdminButton = pubAdminButton;
+    [backView addSubview:_pubAdminButton];
+    
+    // 信息公开
+    UIButton *pubMessButton = [self createButtonWithImage:@"wd" andTitle:@"信息公开" andFrame:CGRectMake(CGRectGetMaxX(_pubAdminButton.frame)+gap_h, 0, Button_W, Button_W)andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:103];
+    _pubMessButton = pubMessButton;
+    [backView addSubview:_pubMessButton];
+    
+    // 我的项目
+    UIButton *myproButton  = [self createButtonWithImage:@"xmsp" andTitle:@"我的项目" andFrame:CGRectMake(gap_h, CGRectGetMaxY(_pubAdminButton.frame)+gap_v, Button_W, Button_W) andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:104];
+    _myProButton = myproButton ;
+    [backView addSubview:_myProButton];
+   
+    // 人事管理
+    UIButton *personalAdminButton  = [self createButtonWithImage:@"hysap" andTitle:@"人事管理" andFrame:CGRectMake(CGRectGetMaxX(_myProButton.frame)+gap_h, CGRectGetMaxY(_pubAdminButton.frame)+gap_v, Button_W, Button_W) andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:105];
+    _personalAdminButton = personalAdminButton ;
+    [backView addSubview:_personalAdminButton];
+    
+    // 通讯录
+    UIButton *insMessButton  = [self createButtonWithImage:@"txl" andTitle:@"通讯录" andFrame:CGRectMake(gap_h+CGRectGetMaxX(_personalAdminButton.frame), CGRectGetMaxY(_pubAdminButton.frame)+gap_v, Button_W, Button_W) andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:106];
+    _insMessButton = insMessButton ;
+    [backView addSubview:_insMessButton];
+    
+    // 系统消息
+    UIButton *sysMessButton = [self createButtonWithImage:@"gg" andTitle:@"系统消息" andFrame:CGRectMake(gap_h, CGRectGetMaxY(personalAdminButton.frame)+gap_v, Button_W, Button_W) andTitleEdgeInsets:UIEdgeInsetsMake(70, -60, 0, 0) andTag:107];
+    _sysMessButton = sysMessButton;
+    [backView addSubview:_sysMessButton];
+
+}
+
+-(UIButton *)createButtonWithImage:(NSString *)imageName andTitle:(NSString *)title andFrame:(CGRect)frame andTitleEdgeInsets:(UIEdgeInsets)titleEdgeInsets andTag:(NSInteger)tag
+{
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+   // button.backgroundColor = [UIColor orangeColor];
+    button.frame = frame;
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
+    [button setTitleEdgeInsets:titleEdgeInsets];
+    [button setImageEdgeInsets:UIEdgeInsetsMake(0, 10, 20, 10)];
+    // 按钮对齐方式设置
+    button.contentHorizontalAlignment=UIControlContentHorizontalAlignmentCenter;
+    button.contentVerticalAlignment=UIControlContentVerticalAlignmentCenter;
+    button.titleLabel.font = [UIFont systemFontOfSize:16.0];
+    [button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    button.tag = tag;
+    [button.titleLabel setTextAlignment:NSTextAlignmentCenter];
+    [button addTarget:self action:@selector(buttonOnclick:) forControlEvents:UIControlEventTouchUpInside];
+    
+    return button;
+}
+
+-(void)buttonOnclick:(UIButton *)btn
+{
+    // 待办事项
+    if (btn.tag == 101)
+    {
+        self.tabBarController.selectedIndex = 1;
+    }
+//    // 项目审批
+//    else if (btn.tag == 102)
+//    {
+//        self.tabBarController.selectedIndex = 1;
+//    }
+    // 行政管理
+    else if (btn.tag == 103){
+        AdminViewController *adminVC = [[AdminViewController alloc] init];
+        adminVC.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:adminVC animated:YES];
+    }
+    else if (btn.tag == 104) {
+        MyProjectViewController *myProjectVC = [[MyProjectViewController alloc] init];
+        myProjectVC.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:myProjectVC animated:YES];
+    }
+    else if (btn.tag == 105) {
+        
+    }
+    else if (btn.tag == 106) {
+        ContactsViewController *contactsVC = [[ContactsViewController alloc] init];
+        contactsVC.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:contactsVC animated:YES];
+    }
+    else if (btn.tag == 107) {
+        
+    }
+}
+
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

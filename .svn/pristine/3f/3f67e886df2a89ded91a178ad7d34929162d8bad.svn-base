@@ -1,0 +1,13 @@
+//
+//  AdminViewController.h
+//  TJYD
+//
+//  Created by 吴定如 on 17/3/16.
+//  Copyright © 2017年 叶松丹. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+
+@interface AdminViewController : UIViewController
+
+@end

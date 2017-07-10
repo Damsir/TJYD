@@ -1,0 +1,366 @@
+//
+//  ChangePasswordVC.m
+//  XAYD
+//
+//  Created by songdan Ye on 16/5/6.
+//  Copyright © 2016年 dist. All rights reserved.
+//
+
+#import "ChangePasswordVC.h"
+#import "LoginViewController.h"
+#import "ChangePasswordAPI.h"
+
+@interface ChangePasswordVC () <UITextFieldDelegate,UITableViewDelegate,UITableViewDataSource>
+
+@property (nonatomic,strong)UIView      *backgroundView;
+@property (nonatomic,strong)UITextField *olderPassworldTextfield;
+@property (nonatomic,strong)UITextField *nPassworldTextfield;
+@property (nonatomic,strong)UITextField *confirmNewPasswordTextfield;
+@property (nonatomic,strong)UIButton    *revertBtn;
+@property (nonatomic,strong)UITableView *revertTableView;
+@property (nonatomic,strong)NSArray     *tipNmae;
+@property (nonatomic,strong)NSArray     *placeHoldeName;
+
+@end
+
+@implementation ChangePasswordVC
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    // 移除通知
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    //self.title=@"修改登录密码";
+    [self initNavigationBarTitle:@"修改密码"];
+    
+    self.view.backgroundColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1];
+    
+    [self createTabelview];
+    [self createRevertBtn];
+    _tipNmae = @[@"原密码:",@"新密码:",@"确认密码:"];
+    _placeHoldeName = @[@"请输入原密码",@"请输入新密码",@"请确认新密码"];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _revertTableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    _revertBtn.frame = CGRectMake(20, SCREEN_HEIGHT-64-80, SCREEN_WIDTH-40, 40);
+    [_revertTableView reloadData];
+}
+
+- (void)createTabelview {
+    
+    UITableView *revertTableView =[[UITableView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT) style:UITableViewStylePlain];
+    revertTableView.backgroundColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1];
+    revertTableView.delegate =self;
+    revertTableView.dataSource = self;
+    revertTableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    revertTableView.scrollEnabled = NO;
+    revertTableView.allowsSelection = NO;
+    _revertTableView =revertTableView;
+    //
+    [self.view addSubview:_revertTableView];
+    
+}
+
+- (void)createRevertBtn
+{
+    UIButton *btn =[UIButton buttonWithType:UIButtonTypeCustom];
+    btn.frame = CGRectMake(20, SCREEN_HEIGHT-64-80, SCREEN_WIDTH-40, 40);
+    btn.backgroundColor = HOMEBLUECOLOR;
+    btn.layer.cornerRadius = 2;
+    btn.clipsToBounds = YES;
+    [btn setTitle:@"确定" forState:UIControlStateNormal];
+    [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [btn addTarget:self action:@selector(revertPassword) forControlEvents:UIControlEventTouchUpInside];
+    _revertBtn = btn;
+    [self.view addSubview:_revertBtn];
+}
+
+#pragma mark -- UITableViewDataSource,UITableViewDelegate
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return 3;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    NSString *idemtity= @"cellidentity";
+    UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleDefault reuseIdentifier:idemtity];
+    for (UIView *view in cell.contentView.subviews) {
+        [view removeFromSuperview];
+    }
+    UILabel *label=  [self createLabelwithframe:CGRectMake(10, 0, 100, 50) font:15 title:_tipNmae[indexPath.row] titleColor:[UIColor blackColor]];
+    
+    UITextField *textField =[[UITextField alloc] initWithFrame:CGRectMake(120, 0, SCREEN_WIDTH-140, 50)];
+    textField.font = [UIFont systemFontOfSize:15];
+    textField.clearButtonMode=UITextFieldViewModeAlways;
+    textField.delegate =self;
+    textField.tag = indexPath.row;
+    textField.borderStyle =UITextBorderStyleNone;
+    textField.placeholder = _placeHoldeName[indexPath.row];
+    textField.returnKeyType =UIReturnKeyDone;
+    UIView *line =[[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(textField.frame), SCREEN_WIDTH, 1)];
+    line.backgroundColor = RGB(238.0, 238.0, 238.0);
+    [cell.contentView addSubview:label];
+    if (indexPath.row ==0) {
+        _olderPassworldTextfield= textField;
+        [cell.contentView addSubview:_olderPassworldTextfield];
+        
+    }else if (indexPath.row==1)
+    {
+        _nPassworldTextfield=textField;
+        [cell.contentView addSubview:_nPassworldTextfield];
+        
+    }else
+    {
+        
+        _confirmNewPasswordTextfield= textField;
+        [cell.contentView addSubview:_confirmNewPasswordTextfield];
+    }
+    [cell.contentView addSubview:line];
+    return cell;
+}
+
+-(CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    return 50;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    
+    return 30;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+   
+    UIView *view = [UIView new];
+    view.backgroundColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1];
+    return view;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+}
+
+
+//- (void) createChangePasswordV
+//{
+//    UIView *backgroundView=[[UIView alloc] initWithFrame:CGRectMake(0, 10, SCREEN_WIDTH, 150)];
+//    backgroundView.backgroundColor =[UIColor whiteColor];
+//    
+//    _backgroundView = backgroundView;
+//    
+//    
+//    UITextField *olderPassword =[self createViewWithFrame:CGRectMake(0, 0, _backgroundView.frame.size.width, 50) titleName:@"当前登录密码:"placeholdName:@"请输入原始密码" withTag:100];
+//    self.olderPassworldTextfield =olderPassword;
+//    UITextField *nPassword = [self createViewWithFrame:CGRectMake(0, CGRectGetMaxY(olderPassword.frame), self.backgroundView.frame.size.width, 50) titleName:@"新密码:"placeholdName:@"请设置新密码"withTag:101];
+//    self.nPassworldTextfield =nPassword;
+//    UITextField *confirmNewPassword =[self createViewWithFrame:CGRectMake(0, 100, self.backgroundView.frame.size.width, 50) titleName:@"确认:"placeholdName:@"请再次填入"withTag:102];
+//    self.confirmNewPasswordTextfield =confirmNewPassword;
+//    [self.view addSubview:_backgroundView];
+//    
+//    
+//    UIButton *btn =[UIButton buttonWithType:UIButtonTypeCustom];
+//    btn.frame = CGRectMake(10, CGRectGetMaxY(self.backgroundView.frame)+30, SCREEN_WIDTH-20, 44);
+//    btn.backgroundColor =RGB(34, 152, 239);
+//    
+//    [btn setTitle:@"修改" forState:UIControlStateNormal];
+//    [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+//    [btn addTarget:self action:@selector(revertPassword) forControlEvents:UIControlEventTouchUpInside];
+//    _revertBtn = btn;
+//    [self.view addSubview:_revertBtn];
+//    
+//    
+//}
+
+- (void)revertPassword {
+
+    [self.olderPassworldTextfield resignFirstResponder];
+    [self.nPassworldTextfield resignFirstResponder];
+    [self.confirmNewPasswordTextfield resignFirstResponder];
+    
+    if ([self.nPassworldTextfield.text isEqualToString:self.confirmNewPasswordTextfield.text] ) {
+        if ([self.olderPassworldTextfield.text isEqualToString:self.nPassworldTextfield.text]) {
+            [MBProgressHUD showError:@"新密码不能和原密码一样"];
+        } else if ([self.nPassworldTextfield.text isEqualToString:@""]) {
+            [MBProgressHUD showError:@"新密码不能为空"];
+        } else {
+            [self changePassWordAction];
+        }
+    }
+    else {
+        [MBProgressHUD showError:@"两次输入的新密码不一致"];
+    }
+    
+}
+
+
+- (void)changePassWordAction {
+    
+    [MBProgressHUD showMessage:@"正在修改" toView:self.view];
+    // 修改密码
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==KingdeeDocking/passwordModify.do?oldPwd=%@&newPwd=%@&confirmPwd=%@,%@",_olderPassworldTextfield.text,_nPassworldTextfield.text,_confirmNewPasswordTextfield.text,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetPasswordModify requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        // 修改成功
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            [MBProgressHUD showSuccess:@"修改成功"];
+            // 清除密码
+            [UserDefaults setObject:@"" forKey:@"password"];
+            // 手势登录,指纹登录功能设置NO
+            [UserDefaults setBool:NO forKey:@"TouchID"];
+            [UserDefaults setObject:nil forKey:@"gesturePassWord"];
+            [UserDefaults setObject:nil forKey:@"loginWay"];
+            [UserDefaults synchronize];
+            
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请重新登录" preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *sureAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"changeRootView" object:self userInfo:nil];
+            }];
+            [alert addAction:sureAction];
+            [self presentViewController:alert animated:YES completion:nil];
+            
+        } else {
+            [MBProgressHUD showError:@"修改失败"];
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+        
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [MBProgressHUD showError:@"修改失败"];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+
+}
+
+- (UILabel *)createLabelwithframe:(CGRect)rect font:(CGFloat)font title:(NSString *)title titleColor:(UIColor *)color {
+    
+    UILabel *label =[[UILabel alloc] initWithFrame:rect];
+    label.font = [UIFont systemFontOfSize:font];
+    [label setText:title];
+    label.textColor =color;
+    [label setTextAlignment:NSTextAlignmentLeft];
+    return label;
+}
+
+- (UITextField *)createViewWithFrame:(CGRect)rect titleName:(NSString *)titleName placeholdName:(NSString *)placehold withTag:(NSInteger)tag
+{
+    UIView *baView =[[UIView alloc] initWithFrame:rect];
+    UILabel *label=  [self createLabelwithframe:CGRectMake(10, 0, 100, 50) font:15 title:titleName titleColor:[UIColor blackColor]];
+    
+    UITextField *textField =[[UITextField alloc] initWithFrame:CGRectMake(CGRectGetMaxX(label.frame)+10, 0, self.backgroundView.frame.size.width-CGRectGetMaxX(label.frame)-10, 50)];
+    textField.font = [UIFont systemFontOfSize:15];
+    textField.clearButtonMode=UITextFieldViewModeAlways;
+    textField.delegate =self;
+    textField.tag = tag;
+    textField.borderStyle =UITextBorderStyleNone;
+    textField.placeholder = placehold;
+    textField.returnKeyType =UIReturnKeyDone;
+    UIView *line =[[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(textField.frame), self.backgroundView.frame.size.width-10, 1)];
+    line.backgroundColor =RGB(238.0, 238.0, 238.0);
+    [baView addSubview:label];
+    [baView addSubview:textField];
+    [baView addSubview:line];
+    [self.backgroundView addSubview:baView];
+    return textField;
+    
+}
+
+
+#pragma mark - textFieldDelegate
+- (BOOL)textFieldShouldReturn:(UITextField *)textField
+{
+    [textField resignFirstResponder];
+    return  YES;
+    
+}
+
+
+- (void)textFieldDidEndEditing:(UITextField *)textField
+{
+    //if(textField.tag == 100)
+    //{
+    //    NSLog(@"检测密码正确与否");
+    //    if ([self.olderPassworldTextfield.text isEqualToString:@""]) {
+    //        //原始密码为空
+    //        [MBProgressHUD showError:@"请输入原始密码"];
+    //
+    //    }else if (![self.olderPassworldTextfield.text isEqualToString:[defaults objectForKey:@"pwd"]] )
+    //    {
+    //        NSLog(@"++++%@",[defaults objectForKey:@"pwd"]);
+    //    [MBProgressHUD showError:@"原始密码不正确"];
+    //        self.olderPassworldTextfield.text = nil;
+    //    }
+    //    else
+    //    {
+    //        NSLog(@"原始密码正确");
+    //
+    //
+    //    }
+    //
+    //}
+    //
+    //    if(textField.tag == 102)
+    //    {
+    //    if([self.nPassworldTextfield.text isEqualToString:@""])
+    //    {
+    //
+    //        [MBProgressHUD showError:@"请输入新密码"];
+    //    }
+    //    if(![self.confirmNewPasswordTextfield.text isEqualToString:self.nPassworldTextfield.text])
+    //        [MBProgressHUD showError:@"亲!2次密码输入不一样!"];
+    //
+    //    }
+    
+    
+}
+
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    [self.olderPassworldTextfield resignFirstResponder];
+    [self.nPassworldTextfield resignFirstResponder];
+    [self.confirmNewPasswordTextfield resignFirstResponder];
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+@end

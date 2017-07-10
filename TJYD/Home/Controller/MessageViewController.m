@@ -1,0 +1,418 @@
+//
+//  MessageViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/5/24.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "MessageViewController.h"
+#import "MessageModel.h"
+#import "MessageCell.h"
+
+static NSString *cellId = @"MessageCell";
+
+@interface MessageViewController ()
+
+// 标记当前是否全选
+@property (nonatomic,assign) BOOL isAllSelected;
+// 当前选中的数据
+@property (nonatomic,strong) NSMutableArray *selectedArray;
+@property (nonatomic,strong) NSMutableArray *indexArray;
+// 删除
+@property (nonatomic,strong) UIBarButtonItem *deleteItem;
+// 删除的ID拼接
+@property (nonatomic,strong) NSString *IDString;
+@property (nonatomic,assign) NSInteger pageSize;
+@property (nonatomic,assign) NSInteger pageIndex;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+
+@end
+
+@implementation MessageViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    [self.tableView setEditing:NO animated:YES];
+    [self.navigationController setToolbarHidden:YES animated:YES];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    //    [self.tableView.header setAutoChangeAlpha:YES];
+    //    [self.tableView.header beginRefreshing];
+}
+
+- (void)dealloc {
+    // 移除通知和监听
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"系统消息"];
+    
+    _pageSize = 10;
+    _pageIndex = 1;
+    _dataArray = [NSMutableArray array];
+    self.selectedArray = [NSMutableArray array];
+    self.indexArray = [NSMutableArray array];
+    [self creatTableView];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    // 右侧编辑按钮
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"编辑" style:UIBarButtonItemStylePlain target:self action:@selector(editOnClick:)];
+    
+    // 监听屏幕旋转
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(screenRotation:) name:UIApplicationWillChangeStatusBarOrientationNotification object:nil];
+    
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotation:(NSNotification *)noty {
+    
+    self.tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64);
+}
+
+#pragma mark -- 加载系统消息
+- (void)loadData {
+    
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 系统消息
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==TJMessage/getReceivedList.do?pageIndex=%ld&pageSize=%ld,%@",_pageIndex,_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetReceivedList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            for (NSDictionary *dic in JsonDic[@"result"][@"list"]) {
+                MessageModel *model = [[MessageModel alloc] initWithDictionary:dic];
+                [_dataArray addObject:model];
+            }
+            NSLog(@"model:%@",_dataArray);
+            [self.tableView reloadData];
+            // 加载更多
+            BOOL loadMore = [JsonDic[@"result"][@"count"] integerValue] > _pageIndex * _pageSize;
+            [self setLoadMoreData:loadMore];
+            
+            // 暂无数据
+            _dataArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+            
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+        DLog(@"%@",error);
+    }];
+}
+
+#pragma mark -- 设置上拉加载更多
+- (void)setLoadMoreData:(BOOL)loadMore {
+    
+    if (loadMore) {
+        // 上拉加载更多
+        [self.tableView.footer resetNoMoreData];
+    } else {
+        // 没有更多数据
+        //self.tableView.footer = nil;
+        [self.tableView.footer noticeNoMoreData];
+    }
+}
+
+- (void)creatTableView {
+    
+    self.tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64);
+    self.tableView.delegate =self;
+    self.tableView.dataSource = self;
+    self.tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    // 开启多选模式,这个方法不会跟滑动删除冲突,最好设置属性进行多选删除 <<很好用>>
+    self.tableView.allowsMultipleSelectionDuringEditing = YES;
+    [self.tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    
+    [self.view addSubview:self.tableView];
+    
+    // 下拉刷新
+    self.tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        _pageIndex = 1;
+        [self loadData];
+    }];
+    // 上拉加载更多
+    self.tableView.footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        _pageIndex ++;
+        [self loadData];
+    }];
+    
+    [self.tableView.header setAutoChangeAlpha:YES];
+    [self.tableView.header beginRefreshing];
+}
+
+#pragma -- mark  UITableViewDataSource,UITableViewDelegate
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    
+    return _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    MessageCell *messageCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    //messageCell.selectionStyle = UITableViewCellSelectionStyleNone;
+    messageCell.selectedBackgroundView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, messageCell.frame.size.width, messageCell.frame.size.height-1.0)];
+    messageCell.selectedBackgroundView.backgroundColor = [UIColor clearColor];
+    [messageCell setHighlighted:NO];
+    
+    if (_dataArray.count > indexPath.row) {
+        
+        MessageModel *model = _dataArray[indexPath.row];
+        messageCell.Title.text = model.TITLE;
+        messageCell.Type.text = model.TYPE;
+        messageCell.Content.text = model.CONTENT;
+        messageCell.Sender.text = model.SENDERUSERNAME1;
+        messageCell.Data.text = model.RECODEDATE;
+        messageCell.Spot.hidden = [model.STATE isEqualToString:@"1"] ? YES : NO;
+    }
+    return messageCell;
+}
+
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    if (_dataArray.count > indexPath.row) {
+        CGFloat cellHeight = [self GetCellHeightWithContent:[_dataArray[indexPath.row] CONTENT]];
+        return cellHeight >= 88.0 ? cellHeight : 88.0;
+    }
+    return 88.0 ;
+}
+
+- (CGFloat)GetCellHeightWithContent:(NSString *)content {
+    
+    CGRect rect = [content boundingRectWithSize:CGSizeMake(SCREEN_WIDTH-45, MAXFLOAT) options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:14.0]} context:nil];
+    return rect.size.height + 68.0;
+}
+
+#pragma mark -- 滑动删除
+//设置右侧删除按钮的文字(默认是Delete)
+- (NSString *)tableView:(UITableView *)tableView titleForDeleteConfirmationButtonForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    return @"删除";
+}
+
+// 删除数据源,更改界面(****单个删除****)
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    // 删除单个cell
+    // 删除系统消息
+    MessageModel *model = _dataArray[indexPath.row];
+    [self.indexArray addObject:indexPath];
+    _IDString = model.ID;
+    
+    [self deleteMessages];
+}
+
+- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    return YES;
+}
+
+#pragma mark -- 选中
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    if (self.tableView.editing) {
+        [self.selectedArray addObject:self.dataArray[indexPath.row]];
+        [self.indexArray addObject:indexPath];
+    }
+    [self judgeDeleteEnable];
+}
+#pragma mark -- 取消选中
+- (void)tableView:(UITableView *)tableView didDeselectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    if (self.tableView.editing) {
+        [self.selectedArray removeObject:self.dataArray[indexPath.row]];
+        [self.indexArray removeObject:indexPath];
+    }
+    [self judgeDeleteEnable];
+}
+
+
+#pragma mark -- 导航右两侧按钮实现方法
+- (void)editOnClick:(UIBarButtonItem *)barButton {
+    //开启和关闭编辑状态
+    if (self.tableView.editing) {
+        [barButton setTitle:@"编辑"];
+        [self.tableView setEditing:NO animated:YES];
+        [self.navigationController setToolbarHidden:YES animated:YES];
+        // 当编辑处于关闭状态时移除删除数组
+        [self.selectedArray removeAllObjects];
+    }
+    else {
+        [barButton setTitle:@"取消"];
+        [self.tableView setEditing:YES animated:YES];
+        [self.navigationController setToolbarHidden:NO animated:YES];
+        // 全选
+        UIBarButtonItem *allItem = [[UIBarButtonItem alloc] initWithTitle:@"全选" style:UIBarButtonItemStyleDone target:self action:@selector(allOnClick:)];
+        // 删除
+        UIBarButtonItem *deleteItem = [[UIBarButtonItem alloc] initWithTitle:@"删除" style:UIBarButtonItemStyleDone target:self action:@selector(deleteOnClick:)];
+        [deleteItem setTintColor:[UIColor lightGrayColor]];
+        [deleteItem setEnabled:NO];
+        _deleteItem = deleteItem;
+        // 创建空格
+        UIBarButtonItem *space = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:self action:nil];
+        
+        NSArray *arrayItems = [NSArray arrayWithObjects:allItem,space,deleteItem, nil];
+        
+        self.toolbarItems = arrayItems;
+    }
+}
+
+#pragma mark -- toolBar上的按钮方法
+- (void)allOnClick:(UIBarButtonItem *)barButton {
+    
+    if (_isAllSelected == NO) {
+        
+        _isAllSelected = YES;
+        [barButton setTitle:@"取消"];
+        
+        self.selectedArray = self.dataArray.mutableCopy;
+        
+        for (int i = 0; i < self.dataArray.count; i++) {
+            
+            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:i inSection:0];
+            [self.tableView selectRowAtIndexPath:indexPath animated:YES scrollPosition:UITableViewScrollPositionNone];
+            [self.indexArray addObject:indexPath];
+        }
+        //        for (MessageModel *data in self.selectedData) {
+        //
+        //            NSLog(@"%@", data.TITLE);
+        //        }
+        
+    } else {
+        
+        _isAllSelected = NO;
+        [barButton setTitle:@"全选"];
+        
+        self.selectedArray = @[].mutableCopy;
+        for (int i = 0; i < self.dataArray.count; i++) {
+            
+            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:i inSection:0];
+            [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+            [self.indexArray removeAllObjects];
+        }
+        //        for (MessageModel *data in self.selectedData) {
+        //
+        //            NSLog(@"%@", data.TITLE);
+        //        }
+    }
+    
+    // 判断是否选择了项目
+    [self judgeDeleteEnable];
+}
+
+- (void)judgeDeleteEnable {
+    
+    if (self.selectedArray.count) {
+        // 系统按钮蓝色
+        [_deleteItem setTintColor:BLUECOLOR_SYSTEM];
+        [_deleteItem setEnabled:YES];
+    } else {
+        [_deleteItem setTintColor:[UIColor lightGrayColor]];
+        [_deleteItem setEnabled:NO];
+    }
+}
+
+- (void)deleteOnClick:(UIBarButtonItem *)barButton {
+    
+    NSMutableArray *IDArray = [NSMutableArray array];
+    for (MessageModel *model in self.selectedArray) {
+        
+        [IDArray addObject:model.ID];
+    }
+    
+    _IDString = [IDArray componentsJoinedByString:@","];
+    
+    [self deleteMessages];
+}
+
+#pragma mark -- 删除操作
+- (void)deleteMessages {
+    
+    _IDString = [NSString stringWithFormat:@"%@,",_IDString];
+    DLog(@"IDString: %@",_IDString);
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==TJMessage/messageDelete.do?messageItemId=%@&%@",_IDString,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeMessageDelete requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            // 数据源操作
+            // 冒泡排序
+            for (int i=0; i<self.indexArray.count; i++){
+                for (int j=i+1; j<self.indexArray.count; j++) {
+                    
+                    NSIndexPath *indexPath1 = self.indexArray[i];
+                    NSIndexPath *indexPath2 = self.indexArray[j];
+                    if(indexPath1.row < indexPath2.row){
+                        [self.indexArray exchangeObjectAtIndex:i withObjectAtIndex:j];
+                    }
+                }
+            }
+            for (NSInteger i=0; i<self.indexArray.count; i++) {
+                
+                NSIndexPath *indexPath = self.indexArray[i];
+                [self.dataArray removeObjectAtIndex:indexPath.row];
+                
+            }
+            [self.tableView reloadData];
+            // 删除之后要清空删除数组
+            [self.indexArray removeAllObjects];
+            
+            [self.navigationItem.rightBarButtonItem setTitle:@"编辑"];
+            [self.tableView setEditing:NO animated:YES];
+            [self.navigationController setToolbarHidden:YES animated:YES];
+            
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        DLog(@"%@",error);
+    }];
+    
+    
+    [self.navigationController setToolbarHidden:YES animated:YES];
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

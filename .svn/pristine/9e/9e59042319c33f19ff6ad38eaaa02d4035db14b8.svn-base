@@ -1,0 +1,102 @@
+//
+//  InfoPublicViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/14.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "InfoPublicViewController.h"
+#import "NoticeViewController.h"
+#import "CourtFilesViewController.h"
+#import "DamSlideSegment.h"
+
+@interface InfoPublicViewController ()
+
+@property (nonatomic,strong) DamSlideSegment *slideSegment;
+@property (nonatomic,strong) NoticeViewController *noticeVC;
+@property (nonatomic,strong) CourtFilesViewController *courtVC;
+
+@end
+
+@implementation InfoPublicViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [_noticeVC viewWillAppear:animated];
+    [_courtVC viewWillAppear:animated];
+    
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+
+}
+
+- (void)dealloc {
+    // 移除通知和监听
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    //[[self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    self.automaticallyAdjustsScrollViewInsets = NO;
+    [self initNavigationBarTitle:@"信息公开"];
+    [self createSlideSegment];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(screenRotation:) name:UIApplicationWillChangeStatusBarOrientationNotification object:nil];
+    
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotation:(NSNotification *)noty {
+    
+    _slideSegment.frame= CGRectMake(0, 0, SCREEN_WIDTH,  SCREEN_HEIGHT - 64 );
+    [_slideSegment screenRotationWithFrame:_slideSegment.frame];
+}
+
+#pragma mark -- 创建slideSegment
+
+- (void)createSlideSegment
+{
+    // 通知公告
+    NoticeViewController *noticeVC = [[NoticeViewController alloc] init];
+    noticeVC.navi = self.navigationController;
+    _noticeVC = noticeVC;
+    
+    //院发文件
+    CourtFilesViewController *courtVC = [[CourtFilesViewController alloc] init];
+    courtVC.navi = self.navigationController;
+    _courtVC = courtVC;
+    
+    NSArray *viewsArray = @[noticeVC.view,courtVC.view];
+    NSArray *titlesArray = @[@"通知公告",@"院发文件"];
+    DamSlideSegment *slideSegment = [[DamSlideSegment alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,  SCREEN_HEIGHT-64) WithControllerViewArray:viewsArray AndWithTitlesArray:titlesArray];
+    slideSegment.backgroundColor = [UIColor whiteColor];
+    _slideSegment = slideSegment;
+    [self.view addSubview:slideSegment];
+}
+
+#pragma mark -- 搜索公文
+
+- (void)searchDocument
+{
+    
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

@@ -1,0 +1,538 @@
+//
+//  DamSlideSegment.m
+//  GZYD
+//
+//  Created by 吴定如 on 17/2/28.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "DamSlideSegment.h"
+#import "DamSlideCollectionCell.h"
+
+#define Margin 0
+#define HeaderHeight 50.0
+#define BigSize 16.0
+#define NormalSize 16.0
+#define Font(size) [UIFont systemFontOfSize:size]
+#define BLUECOLOR [UIColor colorWithRed:34.0/255.0 green:152.0/255.0 blue:239.0/255.0 alpha:1]
+#define MaskColor [UIColor colorWithRed:128.0/255.0 green:128.0/255.0 blue:128.0/255.0 alpha:0.5]
+#define NormalColor [UIColor blackColor]
+#define ItemCount 5
+
+static NSString *CellId = @"DamSlideCollectionCell";
+
+
+@interface DamSlideSegment () <UICollectionViewDataSource, UICollectionViewDelegate,UICollectionViewDelegateFlowLayout,UIScrollViewDelegate,UIGestureRecognizerDelegate>
+
+{
+    CGFloat segmentWidth;
+    CGFloat scrollViewHeight;
+}
+
+@property (nonatomic,assign) NSInteger itemNum;//控制器个数
+@property (nonatomic,strong) NSArray *items;//控制器标题
+@property (nonatomic,strong) NSArray *viewsArray;//控制器视图
+@property (nonatomic,strong) UICollectionViewFlowLayout *layout;
+@property (nonatomic,strong) UICollectionView *collectView;//顶部滑动视图
+@property (nonatomic,assign) NSInteger segmentToIndex;//顶部滑动偏移
+@property (nonatomic,strong) UIScrollView *scrollView;//控制器滑动
+@property (nonatomic,assign) NSInteger selectedIndex;//记录当前选择的按钮
+@property (nonatomic,strong) UIView *underLineView;//下划线
+@property (nonatomic,assign) CGFloat underLineX;//下划线的x位置
+@property (nonatomic,assign) CGFloat underLineWidth;//下划线的宽度
+@property (nonatomic,assign) CGFloat widthPercent;//宽度百分百
+@property (nonatomic,strong) UIView *shadowLine;//分割线
+
+@end
+
+@implementation DamSlideSegment
+
+-(instancetype)initWithFrame:(CGRect)frame WithControllerViewArray:(NSArray *)viewsArray AndWithTitlesArray:(NSArray *)titlesArray
+{
+    self = [super initWithFrame:frame];
+    if (self)
+    {
+        _itemNum = viewsArray.count;
+        _items = titlesArray;
+        _viewsArray = viewsArray;
+        scrollViewHeight = frame.size.height;
+        //默认当前点击为第一个按钮
+        _selectedIndex = 0;
+        // segment宽度
+        if (_itemNum <= ItemCount)
+        {
+            segmentWidth = frame.size.width/_itemNum;
+        }
+        else
+        {
+            segmentWidth = frame.size.width/ItemCount;
+        }
+        
+        [self initSlideSegmentAndScrollView];
+        [self initUnderLineView];
+        [self initShadowLine];
+        _widthPercent = frame.size.width/SCREEN_WIDTH;
+    }
+    return self;
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotationWithFrame:(CGRect)frame
+{
+    // 设置self的高度
+    scrollViewHeight = frame.size.height;
+    // segment宽度
+    if (_itemNum <= ItemCount)
+    {
+        segmentWidth = frame.size.width/_itemNum;
+    }
+    else
+    {
+        segmentWidth = frame.size.width/ItemCount;
+    }
+    
+    CGRect rect = CGRectMake(Margin,0,frame.size.width,HeaderHeight);
+    _layout.itemSize = CGSizeMake(segmentWidth, HeaderHeight);
+    //初始化collectionView
+    _collectView.frame = rect;
+    [_collectView scrollToItemAtIndexPath:[NSIndexPath indexPathForRow:_selectedIndex inSection:0] atScrollPosition:UICollectionViewScrollPositionNone animated:NO];
+    if (_selectedIndex > 2 && _selectedIndex < _itemNum - 2) {
+        [_collectView setContentOffset:CGPointMake((_selectedIndex-2)*segmentWidth, 0)];
+    }else if (_selectedIndex >= _itemNum -2 ){
+        [_collectView setContentOffset:CGPointMake((_itemNum-2-2-1)*segmentWidth, 0)];
+    }
+    
+    _scrollView.frame = CGRectMake(0, HeaderHeight, SCREEN_WIDTH, scrollViewHeight-HeaderHeight);
+    _scrollView.contentSize = CGSizeMake(SCREEN_WIDTH * _itemNum, scrollViewHeight-HeaderHeight);
+    _scrollView.contentOffset = CGPointMake(_selectedIndex * SCREEN_WIDTH, 0);
+    
+    //将控制器的视图添加到scrollView上
+    for (int i=0; i<_viewsArray.count; i++)
+    {
+        UIView *view = _viewsArray[i];
+        view.frame = CGRectMake(i*SCREEN_WIDTH, 0, SCREEN_WIDTH, scrollViewHeight - HeaderHeight);
+    }
+    
+    // 下划线
+    CGSize titleSize = [self sizeWithText:_items[_selectedIndex] font:Font(BigSize) maxSize:CGSizeMake(segmentWidth, MAXFLOAT)];
+    CGFloat X = (_selectedIndex * segmentWidth) + (segmentWidth - titleSize.width)*0.5;
+    // 和字体宽度一样宽的下划线
+    _underLineView.frame = CGRectMake(X,HeaderHeight-2,titleSize.width,2);
+    // 和按钮宽度一样的下划线
+    _underLineView.frame = CGRectMake(_selectedIndex * segmentWidth,HeaderHeight-2.5,segmentWidth,2);
+    // 宽度百分百
+    _widthPercent = frame.size.width/SCREEN_WIDTH;
+    // 分割线
+    _shadowLine.frame = CGRectMake(0, HeaderHeight-0.5, SCREEN_WIDTH, 0.5);
+
+}
+
+#pragma mark -- 初始化sliderSegment
+
+-(void)initSlideSegmentAndScrollView
+{
+    CGRect rect = CGRectMake(Margin,0,SCREEN_WIDTH,HeaderHeight);
+    //初始化布局类(UICollectionViewLayout的子类)
+    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc]init];
+    //设置水平方向滑动
+    layout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
+    _layout = layout;
+    layout.itemSize = CGSizeMake(segmentWidth, HeaderHeight);
+    layout.minimumInteritemSpacing = 0;//设置行间隔
+    layout.minimumLineSpacing = 0;//设置列间隔
+    //初始化collectionView
+    UICollectionView *collectView = [[UICollectionView alloc]initWithFrame:rect collectionViewLayout:layout];
+    collectView.backgroundColor = [UIColor whiteColor];
+    //设置代理
+    collectView.delegate = self;
+    collectView.dataSource = self;
+    collectView.showsHorizontalScrollIndicator = NO;
+    collectView.bounces = NO;
+    // 注册cell
+    [collectView registerNib:[UINib nibWithNibName:@"DamSlideCollectionCell" bundle:nil] forCellWithReuseIdentifier:CellId];
+    
+
+    _collectView = collectView;
+    [self addSubview:collectView];
+    
+    // 底层滑动视图
+    UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, HeaderHeight, SCREEN_WIDTH, scrollViewHeight-HeaderHeight)];
+    scrollView.contentSize = CGSizeMake(SCREEN_WIDTH*_itemNum, scrollViewHeight-HeaderHeight);
+    scrollView.contentOffset = CGPointMake(0, 0);
+    scrollView.pagingEnabled = YES;
+    scrollView.showsVerticalScrollIndicator = NO;
+    scrollView.showsHorizontalScrollIndicator = NO;
+    scrollView.bounces = NO;
+    scrollView.delegate = self;
+    _scrollView = scrollView;
+    [self addSubview:scrollView];
+    
+    //将控制器的视图添加到scrollView上
+    for (int i=0; i<_viewsArray.count; i++)
+    {
+        UIView *view = _viewsArray[i];
+        view.frame = CGRectMake(i * SCREEN_WIDTH, 0, SCREEN_WIDTH, scrollViewHeight-HeaderHeight);
+        [_scrollView addSubview:view];
+    }
+    
+    // 监听contentOffset
+    //[_scrollView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:nil];
+    /**
+     *  Description
+     */
+//    if (_selectedIndex == 0) {
+//        _scrollView.scrollEnabled = NO;
+//    }else{
+//        _scrollView.scrollEnabled = YES;
+//    }
+}
+
+- (void)initShadowLine {
+    
+    UIView *line = [[UIView alloc] initWithFrame:CGRectMake(0, HeaderHeight-0.5, SCREEN_WIDTH, 0.5)];
+    line.backgroundColor = GRAYCOLOR_MIDDLE;
+//    //设置阴影的颜色
+//    line.layer.shadowColor = GRAYCOLOR_DARK.CGColor;
+//    //设置阴影的偏移量，如果为正数，则代表为往右边偏移
+//    line.layer.shadowOffset=CGSizeMake(0, 0.5);
+//    //设置阴影的透明度(0~1之间，0表示完全透明)
+//    line.layer.shadowOpacity = 0.8;
+//    line.layer.shadowRadius = 0.5;//阴影半径，默认3
+    _shadowLine = line;
+    [self addSubview:line];
+}
+
+
+#pragma mark -- 初始化下划线
+
+-(void)initUnderLineView
+{
+    // CGSize titleSize = [self sizeWithText:[_items firstObject] font:Font(BigSize) maxSize:CGSizeMake(segmentWidth, MAXFLOAT)];
+    // 和字体宽度一样宽的下划线
+    // UIView *underLineView = [[UIView alloc] initWithFrame:CGRectMake((segmentWidth - titleSize.width)*0.5,HeaderHeight-2,titleSize.width,2)];
+    // 和按钮宽度一样宽的下划线
+    UIView *underLineView = [[UIView alloc] initWithFrame:CGRectMake(0,HeaderHeight-2.5,segmentWidth,2)];
+    underLineView.backgroundColor = HOMEBLUECOLOR;
+    _underLineView = underLineView;
+    [_collectView addSubview:underLineView];
+    
+}
+
+#pragma mark -- 设置下划线的起始位置
+
+-(void)setUnderLineX:(CGFloat)underLineX
+{
+    _underLineX = underLineX;
+    CGRect frame = _underLineView.frame;
+    frame.origin.x = underLineX;
+    _underLineView.frame = frame;
+}
+
+#pragma mark -- 设置下划线的宽度
+
+-(void)setUnderLineWidth:(CGFloat)underLineWidth
+{
+    _underLineWidth = underLineWidth;
+    CGRect frame = _underLineView.frame;
+    frame.size.width = underLineWidth;
+    _underLineView.frame = frame;
+}
+
+#pragma mark -- 从某个item移动到另一个item
+ 
+-(void)setItemColorFromIndex:(NSInteger)fromIndex to:(NSInteger)toIndex{
+    
+    [self scrollToWithIndexPath:[NSIndexPath indexPathForRow:toIndex inSection:0]];
+    DamSlideCollectionCell *fromCell = (DamSlideCollectionCell *)[_collectView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:fromIndex inSection:0]];
+    DamSlideCollectionCell *toCell = (DamSlideCollectionCell *)[_collectView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:toIndex inSection:0]];
+    
+    [fromCell.title setTextColor:NormalColor];
+    [fromCell setFontScale:NO];//反选字体保持原样
+    [toCell.title setTextColor:HOMEBLUECOLOR];
+    [toCell setFontScale:YES];//选中字体放大
+
+    _selectedIndex = toIndex;
+}
+
+#pragma mark -- 设置移动位置
+
+-(void)scrollToWithIndexPath:(NSIndexPath *)indexPath{
+    
+    NSInteger toRow = indexPath.row;
+    
+    // 点击 字体和下划线改变
+    CGSize titleSize = [self sizeWithText:_items[toRow] font:Font(BigSize) maxSize:CGSizeMake(segmentWidth, MAXFLOAT)];
+    if (toRow != _selectedIndex) {
+        
+        [UIView animateWithDuration:0.35 animations:^{
+            // 和字体宽度一样的下划线
+            CGFloat X = _selectedIndex * segmentWidth + (segmentWidth - titleSize.width)*0.5;
+//            [self setUnderLineX:X];
+//            [self setUnderLineWidth:titleSize.width];
+            // 和按钮宽度一样的下划线
+            X = _selectedIndex * segmentWidth;
+            [self setUnderLineX:X];
+            [self setUnderLineWidth:segmentWidth];
+            
+        }];
+        NSLog(@"item = %ld",(long)toRow);
+    }
+    
+    //    _currentBarIndex = toRow;
+    
+    if (indexPath.row > _selectedIndex) {
+        if ((indexPath.row+2) < _items.count) {
+            toRow = indexPath.row+2;
+            // NSLog(@"toRow = %ld",toRow);
+        }else if ((indexPath.row+1) < _items.count) {
+            toRow = indexPath.row+1;
+            // NSLog(@"toRow = %ld",toRow);
+        }else;
+        [_collectView scrollToItemAtIndexPath:[NSIndexPath indexPathForRow:toRow inSection:0] atScrollPosition:UICollectionViewScrollPositionNone animated:YES];
+    }else if (indexPath.row < _selectedIndex){
+        if ((indexPath.row-2) >= 0) {
+            toRow = indexPath.row-2;
+            // NSLog(@"toRow = %ld",toRow);
+        }else if ((indexPath.row-1) >= 0) {
+            toRow = indexPath.row-1;
+            // NSLog(@"toRow = %ld",toRow);
+        }else;
+        [_collectView scrollToItemAtIndexPath:[NSIndexPath indexPathForRow:toRow inSection:0] atScrollPosition:UICollectionViewScrollPositionNone animated:YES];
+    }else{
+        return;
+    }
+    
+}
+
+#pragma -- UICollectionViewDataSource
+
+- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section
+{
+    return _items.count;
+}
+
+- (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
+{
+    DamSlideCollectionCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:CellId forIndexPath:indexPath];
+    cell.title.text = _items[indexPath.row];
+    cell.title.font = [UIFont fontWithName:Font_PingFangSC_Regular size:NormalSize];
+    cell.backgroundColor = [UIColor whiteColor];
+    if (indexPath.row == _selectedIndex) {
+        [cell.title setTextColor:HOMEBLUECOLOR];
+        [cell.title setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:BigSize]];
+    }else{
+        [cell.title setTextColor:NormalColor];
+        [cell.title setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:NormalSize]];
+    }
+
+    return cell;
+}
+
+//-(UIEdgeInsets)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout insetForSectionAtIndex:(NSInteger)section
+//{
+//    return UIEdgeInsetsMake(0, 0, 0, 0);
+//}
+
+-(void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath{
+    
+    //[self scrollToWithIndexPath:indexPath];
+    [self setItemColorFromIndex:_selectedIndex to:indexPath.row];
+    _scrollView.contentOffset = CGPointMake(SCREEN_WIDTH * indexPath.row, 0);
+    
+}
+
+
+#pragma mark -- scrollViewDelegate
+
+-(void)scrollViewDidScroll:(UIScrollView *)scrollView
+{
+    if (scrollView == _scrollView)
+    {
+        int toIndex = (int)(_scrollView.contentOffset.x/_scrollView.frame.size.width + 0.5);
+        NSLog(@"whichItem_DidScroll:%ld",(long)toIndex);
+        // 设置下划线位置和宽度
+        CGSize titleSize = [self sizeWithText:_items[toIndex] font:Font(BigSize) maxSize:CGSizeMake(segmentWidth, MAXFLOAT)];
+        if (toIndex != _selectedIndex) {
+            //**
+            //[self setItemColorFromIndex:_currentBarIndex to:whichItem];
+            [UIView animateWithDuration:0.35 animations:^{
+                CGFloat X = _selectedIndex * segmentWidth + (segmentWidth - titleSize.width)*0.5;
+                
+                if (_itemNum  <= ItemCount)
+                {
+                    X = _scrollView.contentOffset.x* _widthPercent/_itemNum;
+                }
+                else
+                {
+                    X = _scrollView.contentOffset.x* _widthPercent/ItemCount;
+                }
+                [self setUnderLineX:X];
+                [self setUnderLineWidth:segmentWidth];
+            }];
+        }
+        if (_scrollView.isDragging)
+        {
+            CGFloat X = segmentWidth * toIndex + (segmentWidth - titleSize.width) * 0.5;
+            if (_itemNum <= ItemCount)
+            {
+                X = _scrollView.contentOffset.x*_widthPercent/_itemNum;
+            }
+            else
+            {
+                X = _scrollView.contentOffset.x*_widthPercent/ItemCount;
+            }
+            [self setUnderLineX:X];
+        }
+        else
+        {
+            [UIView animateWithDuration:0.35 animations:^{
+                CGFloat X = segmentWidth * toIndex + (segmentWidth - titleSize.width) * 0.5;
+                if (_itemNum <= ItemCount)
+                {
+                    X = _scrollView.contentOffset.x*_widthPercent/_itemNum;
+                }
+                else
+                {
+                    X = _scrollView.contentOffset.x*_widthPercent/ItemCount;
+                }
+                [self setUnderLineX:X];
+            }];
+        }
+    }
+    /**
+     *  Description
+     */
+//    if (_selectedIndex == 0) {
+//        _scrollView.scrollEnabled = NO;
+//    }else{
+//        _scrollView.scrollEnabled = YES;
+//    }
+}
+
+-(void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
+{
+    if (scrollView == _scrollView)
+    {
+        NSInteger toIndex = _scrollView.contentOffset.x/_scrollView.frame.size.width;
+        NSLog(@"toIndex:%ld",(long)toIndex);
+        // 设置下划线位置和宽度
+        CGSize titleSize = [self sizeWithText:_items[toIndex] font:Font(BigSize) maxSize:CGSizeMake(segmentWidth, MAXFLOAT)];
+        if (toIndex != _selectedIndex) {
+            [self setItemColorFromIndex:_selectedIndex to:toIndex];
+            [UIView animateWithDuration:0.35 animations:^{
+                
+                // 和字体宽度一样的下划线
+                CGFloat X = _selectedIndex * segmentWidth + (segmentWidth - titleSize.width)*0.5;
+                // 和按钮宽度一样的下划线
+                if (_itemNum <= ItemCount)
+                {
+                    X = _scrollView.contentOffset.x* _widthPercent/_itemNum;
+                }
+                else
+                {
+                    X = _scrollView.contentOffset.x*_widthPercent/ItemCount;
+                }
+                [self setUnderLineX:X];
+                [self setUnderLineWidth:segmentWidth];
+            }];
+        }
+        if (_scrollView.isDragging) {
+            // 和字体宽度一样的下划线
+            CGFloat X = _selectedIndex * segmentWidth + (segmentWidth - titleSize.width)*0.5;
+            // 和按钮宽度一样的下划线
+            if (_itemNum <= ItemCount)
+            {
+                X = _scrollView.contentOffset.x*_widthPercent/_itemNum;
+            }
+            else
+            {
+                X = _scrollView.contentOffset.x*_widthPercent/ItemCount;
+            }
+            [self setUnderLineX:X];
+
+        }else{
+            [UIView animateWithDuration:0.35 animations:^{
+                // 和字体宽度一样的下划线
+                CGFloat X = _selectedIndex * segmentWidth + (segmentWidth - titleSize.width)*0.5;
+                // 和按钮宽度一样的下划线
+                if (_itemNum <= ItemCount)
+                {
+                    X = _scrollView.contentOffset.x*_widthPercent/_itemNum;
+                }
+                else
+                {
+                    X = _scrollView.contentOffset.x*_widthPercent/ItemCount;
+                }
+                [self setUnderLineX:X];
+            }];
+        }
+        _selectedIndex = toIndex;
+    }
+    /**
+     *  Description
+     */
+//    if (_selectedIndex == 0) {
+//        _scrollView.scrollEnabled = NO;
+//    }else{
+//        _scrollView.scrollEnabled = YES;
+//    }
+}
+
+#pragma mark -- 计算字体尺寸
+
+/**
+ *  计算文字尺寸
+ *
+ *  @param text    需要计算尺寸的文字
+ *  @param font    文字的字体
+ *  @param maxSize 文字的最大尺寸
+ */
+- (CGSize)sizeWithText:(NSString *)text font:(UIFont *)font maxSize:(CGSize)maxSize
+{
+    NSDictionary *attrs = @{NSFontAttributeName : font};
+    return [text boundingRectWithSize:maxSize options:NSStringDrawingUsesLineFragmentOrigin attributes:attrs context:nil].size;
+}
+
+/**
+ 移除监听方法有两种:
+ 1.重写removeFromSuperview 方法移除监听
+ */
+-(void)removeFromSuperview{
+     [super removeFromSuperview];
+    //移除监听contentOffset
+    //    [_scrollView removeObserver:self forKeyPath:@"contentOffset"];
+        [_scrollView removeFromSuperview];
+        _scrollView = nil;
+    
+    
+}
+/**
+ *  2.重写dealloc 方法移除监听
+ */
+-(void)dealloc
+{
+    //移除监听contentOffset
+    //    [_scrollView removeObserver:self forKeyPath:@"contentOffset"];
+    //    [_scrollView removeFromSuperview];
+    //    _scrollView = nil;
+}
+
+- (void)layoutSubviews
+{
+    [super layoutSubviews];
+}
+
+
+-(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    
+    if(gestureRecognizer.state != 0) {
+        
+        return YES;
+        
+    }else {
+        
+        return NO;}
+        
+}
+    
+@end

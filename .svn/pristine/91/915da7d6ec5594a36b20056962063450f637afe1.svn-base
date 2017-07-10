@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="10117" systemVersion="15G1510" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="10085"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <tableViewCell contentMode="scaleToFill" selectionStyle="default" indentationWidth="10" id="KGk-i7-Jjw" customClass="ProjectMaterialCell">
+            <rect key="frame" x="0.0" y="0.0" width="375" height="44"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="KGk-i7-Jjw" id="H2p-sc-9uM">
+                <rect key="frame" x="0.0" y="0.0" width="375" height="43.5"/>
+                <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="fileName" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="nSV-fg-BdW">
+                        <rect key="frame" x="70" y="12" width="235" height="20"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="20" id="rNj-GU-lvp"/>
+                        </constraints>
+                        <fontDescription key="fontDescription" type="system" pointSize="13"/>
+                        <color key="textColor" red="0.25882352939999997" green="0.25882352939999997" blue="0.25882352939999997" alpha="1" colorSpace="calibratedRGB"/>
+                        <nil key="highlightedColor"/>
+                    </label>
+                    <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="AOd-AW-sEk">
+                        <rect key="frame" x="35" y="10" width="25" height="25"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="25" id="N8E-iI-Wz7"/>
+                            <constraint firstAttribute="width" constant="25" id="nJn-fL-udz"/>
+                        </constraints>
+                    </imageView>
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="M8i-1F-FSC" userLabel="line">
+                        <rect key="frame" x="0.0" y="43" width="375" height="1"/>
+                        <color key="backgroundColor" red="0.86274509799999999" green="0.86274509799999999" blue="0.86274509799999999" alpha="1" colorSpace="calibratedRGB"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="1" id="ruZ-qr-bMM"/>
+                        </constraints>
+                    </view>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="fileSize" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="RoC-wv-flg">
+                        <rect key="frame" x="310" y="12" width="55" height="20"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="20" id="1OJ-n2-ekG"/>
+                            <constraint firstAttribute="width" constant="55" id="gdp-cD-fep"/>
+                        </constraints>
+                        <fontDescription key="fontDescription" type="system" pointSize="11"/>
+                        <color key="textColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+                        <nil key="highlightedColor"/>
+                    </label>
+                </subviews>
+                <constraints>
+                    <constraint firstItem="M8i-1F-FSC" firstAttribute="top" secondItem="AOd-AW-sEk" secondAttribute="bottom" constant="8" id="0cl-eK-hTt"/>
+                    <constraint firstItem="RoC-wv-flg" firstAttribute="leading" secondItem="nSV-fg-BdW" secondAttribute="trailing" constant="5" id="KKk-rb-MgC"/>
+                    <constraint firstAttribute="trailing" secondItem="RoC-wv-flg" secondAttribute="trailing" constant="10" id="Y0Z-t2-BN0"/>
+                    <constraint firstItem="AOd-AW-sEk" firstAttribute="leading" secondItem="H2p-sc-9uM" secondAttribute="leading" constant="35" id="adY-bJ-1Wz"/>
+                    <constraint firstItem="AOd-AW-sEk" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="10" id="dyF-4e-JRL"/>
+                    <constraint firstItem="RoC-wv-flg" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="12" id="dzV-iV-2MH"/>
+                    <constraint firstAttribute="trailing" secondItem="M8i-1F-FSC" secondAttribute="trailing" id="eLQ-fa-j5u"/>
+                    <constraint firstItem="nSV-fg-BdW" firstAttribute="leading" secondItem="AOd-AW-sEk" secondAttribute="trailing" constant="10" id="oUs-J1-0wf"/>
+                    <constraint firstItem="M8i-1F-FSC" firstAttribute="leading" secondItem="H2p-sc-9uM" secondAttribute="leading" id="ofp-rK-RXP"/>
+                    <constraint firstItem="nSV-fg-BdW" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="12" id="u7L-xa-P2V"/>
+                </constraints>
+            </tableViewCellContentView>
+            <color key="backgroundColor" red="0.92156862745098034" green="0.94117647058823528" blue="0.96078431372549022" alpha="1" colorSpace="calibratedRGB"/>
+            <connections>
+                <outlet property="fileName" destination="nSV-fg-BdW" id="EJ6-td-XiR"/>
+                <outlet property="fileSize" destination="RoC-wv-flg" id="Jl5-5m-TfQ"/>
+                <outlet property="fileTypeImage" destination="AOd-AW-sEk" id="tcF-Kv-Okg"/>
+            </connections>
+            <point key="canvasLocation" x="-696.5" y="370"/>
+        </tableViewCell>
+    </objects>
+</document>

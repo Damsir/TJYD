@@ -1,0 +1,160 @@
+//
+//  MyProjectViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/10.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "MyProjectViewController.h"
+#import "MyProjectCell.h"
+#import "MyProjectModel.h"
+
+static NSString *cellId = @"MyProjectCell";
+
+@interface MyProjectViewController () <UITableViewDelegate,UITableViewDataSource>
+
+@property (nonatomic,strong) UITableView *tableView;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,assign) NSInteger pageSize;
+
+@end
+
+@implementation MyProjectViewController
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor purpleColor];
+    [self initNavigationBarTitle:@"我的项目"];
+    
+    _dataArray = [NSMutableArray array];
+    _pageSize = 10;
+    
+    [self creatTableView];
+    [self loadData];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64);
+}
+
+- (void)loadData
+{
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 我的项目
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[NSString stringWithFormat:@"action==tongjiProcess/getProjectOfMyList.do?queryFilter=&pageIndex=1&pageSize=%ld,%@",_pageSize,ticket] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProjectOfMyList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            MyProjectModel *model = [[MyProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (MyListModel *listModel in model.list) {
+                [_dataArray addObject:listModel];
+            }
+            NSLog(@"model:%@",_dataArray);
+            [_tableView reloadData];
+            
+            [_tableView.header endRefreshing];
+            [_tableView.footer endRefreshing];
+            
+        }
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [_tableView.header endRefreshing];
+        [_tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+- (void)creatTableView
+{
+    UITableView *tableView =[[UITableView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64) style:UITableViewStylePlain];
+    tableView.delegate =self;
+    tableView.dataSource = self;
+    tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    [tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    _tableView = tableView;
+    
+    [self.view addSubview:tableView];
+    
+    // 下拉刷新
+    _tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        //_pageSize = 20;
+        [self loadData];
+    }];
+    // 上拉加载更多
+    _tableView.footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        _pageSize += 10;
+        [self loadData];
+    }];
+}
+
+#pragma -mark  UITableViewDataSource,UITableViewDelegate
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    MyProjectCell *projectCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    
+    if (_dataArray.count > indexPath.row) {
+        
+        MyListModel *model = _dataArray[indexPath.row];
+        projectCell.title.text = model.PROJECTNAME;
+        projectCell.activityName.text = [model.ACTIVITY_NAME isEqualToString:@""] ? model.PROJECTACCEPTMODE :  [NSString stringWithFormat:@"%@ · %@",model.PROJECTACCEPTMODE,model.ACTIVITY_NAME];
+        projectCell.userRole.text = model.userRole;
+    }
+    return projectCell;
+}
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    return 70.0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    
+}
+
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+@end

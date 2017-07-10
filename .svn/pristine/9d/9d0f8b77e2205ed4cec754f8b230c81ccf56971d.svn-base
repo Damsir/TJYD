@@ -1,0 +1,83 @@
+//
+//  NewsDetailViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/21.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "NewsDetailViewController.h"
+
+
+@interface NewsDetailViewController () <UIWebViewDelegate>
+
+@property (nonatomic,strong) UIWebView *webView;
+
+@end
+
+@implementation NewsDetailViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:_newsListModel.GSBT];
+    
+    
+    [self creatWebView];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _webView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+}
+
+- (void)creatWebView
+{
+    UIWebView *webView = [[UIWebView alloc] init];
+    webView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    webView.backgroundColor = [UIColor whiteColor];
+    //    [webView.scrollView setZoomScale:1.5 animated:YES];
+    // 缩放设置
+    //    [webView setScalesPageToFit:YES];
+    
+    NSString *newsDetail = _newsListModel.GSNR;
+    
+    [webView loadHTMLString:[NSString stringWithFormat:@"<html>%@<html>",newsDetail] baseURL:nil];
+    _webView = webView;
+    [self.view addSubview:webView];
+    
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

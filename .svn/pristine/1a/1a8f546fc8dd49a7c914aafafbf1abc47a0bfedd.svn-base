@@ -1,0 +1,255 @@
+//
+//  SendViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/28.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "SendViewController.h"
+#import "SendTreeView.h"
+#import "SendPeopleCellModel.h"
+#import "SendModel.h"
+
+@interface SendViewController () <TreeDelegate>
+
+@property (nonatomic,strong) SendTreeView *sendTreeView;
+@property (nonatomic,strong) UIView *sendView;
+@property (nonatomic,strong) UIView *sendline;
+@property (nonatomic,strong) UIButton *sendButton;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,strong) NSArray *dictUserArray;
+
+@end
+
+@implementation SendViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"发送给"];
+    
+    [self creatSendButton];
+    [self loadData];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    
+    _sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    _sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    _sendButton.frame = CGRectMake(_sendView.frame.size.width/2-250/2, 10, 250, 40);
+    _sendTreeView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-60);
+    [_sendTreeView screenRotation];
+}
+
+- (void)loadData {
+    
+    _dataArray = [NSMutableArray array];
+    
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 我的项目
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==send/getActivities.do?projectId=%@&taskId=%@,%@",_listModel.PID,_listModel.TASK_ID,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetActivities requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            NSArray *children = [[JsonDic objectForKey:@"result"] objectForKey:@"children"];
+            
+            SendTreeView *treeView = [[SendTreeView instanceView] initTreeWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-60) dataArray:children haveHiddenSelectBtn:NO haveHeadView:NO isEqualX:NO];
+            treeView.delegate = self;
+            treeView.backgroundColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1.0];
+            treeView.backgroundColor = [UIColor whiteColor];
+            _sendTreeView = treeView;
+            [self.view addSubview:treeView];
+            
+            
+            for (NSDictionary *dic in children) {
+                SendModel *sendModel = [[SendModel alloc] initWithDictionary:dic];
+                [_dataArray addObject:sendModel];
+            }
+            DLog(@"SendModel:%@",_dataArray);
+            
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- SendTreeViewDelegate
+- (void)itemSelectInfo:(SendPeopleCellModel *)item {
+    
+    DLog(@"DamPeopleCellModel::%@",item);
+//    SendPeopleCellModel *peopleModel = item;
+}
+
+- (void)itemSelectArray:(NSArray *)selectArray {
+    
+    if (selectArray.count) {
+        
+        self.sendButton.enabled = YES;
+        self.sendButton.backgroundColor = HOMEBLUECOLOR;
+        
+        for (int i=0; i<selectArray.count; i++) {
+            
+            // 选择人员的Id
+            NSString *Id = [selectArray[i] objectForKey:@"id"];
+            
+            for (int j=0; j<_dataArray.count; j++) {
+                SendModel *sendModel = _dataArray[j];
+                for (SendListModel *sendListModel in sendModel.children) {
+                    if ([sendListModel.Id isEqualToString:Id]) {
+                        sendListModel.isSelect = @"YES";
+                    }
+                }
+            }
+        }
+        
+        for (int i=0; i<_dataArray.count; i++) {
+            
+            SendModel *sendModel = _dataArray[i];
+            
+            for (int j=0; j<sendModel.children.count; j++) {
+                SendListModel *sendListModel = sendModel.children[j];
+                if (![sendListModel.isSelect isEqualToString:@"YES"]) {
+                    [sendModel.children removeObject:sendListModel];
+                }
+            }
+        }
+        DLog(@"SiftArr%@",_dataArray);
+
+        // Model array -> JSON array
+        NSArray *dictUserArray = [SendModel mj_keyValuesArrayWithObjectArray:_dataArray];
+        DLog(@"dictArray:%@", dictUserArray);
+        _dictUserArray = dictUserArray;
+        
+        
+        // 发送(保存人员)
+        [MBProgressHUD showMessage:@"正在发送" toView:self.view];
+        
+        NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+        NSString *encryptDes = [NSString stringWithFormat:@"action==send/saveSelectUsers.do?projectId=%@&taskId=%@&selectData=%@&activityName=,%@",_listModel.PID,_listModel.TASK_ID,dictUserArray,ticket];
+        DLog(@"jiamizhiqian:%@",encryptDes);
+        encryptDes = [encryptDes stringByReplacingOccurrencesOfString:@" " withString:@""];
+        NSUInteger bytes = [encryptDes lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        
+        
+        NSString *des = [DES encryptUseDES:[encryptDes stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+        DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetSaveSelectUsers requestMethod:DistRequestMethodPost arguments:nil];
+        [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+            
+            NSDictionary *JsonDic = request.responseJSONObject;
+            
+            if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+                
+                DLog(@"success");
+                
+            } else {
+                // 单点登录超时(sessionTimeOut)
+                [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                }];
+            }
+            //加载提示框
+            [MBProgressHUD hideHUDForView:self.view animated:NO];
+        } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+            [MBProgressHUD hideHUDForView:self.view animated:NO];
+        }];
+        
+    } else {
+        
+        self.sendButton.enabled = NO;
+        self.sendButton.backgroundColor = [UIColor lightGrayColor];
+    }
+    NSLog(@"SendSelectArray::%@",selectArray);
+}
+
+- (void)creatSendButton {
+    
+    UIView *sendView = [[UIView alloc] init];
+    sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    sendView.backgroundColor = [UIColor whiteColor];
+    _sendView = sendView;
+    [self.view addSubview:sendView];
+    
+    UIView *sendline = [[UIView alloc] init];
+    sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    sendline.backgroundColor = GRAYCOLOR_MIDDLE;
+    _sendline = sendline;
+    [sendView addSubview:sendline];
+    
+    UIButton *sendButton = [self createCustomButtonWithTitle:@"完 成"];
+    sendButton.frame = CGRectMake(sendView.frame.size.width/2-250/2, 10, 250, 40);
+    sendButton.enabled = NO;
+    sendButton.backgroundColor = [UIColor lightGrayColor];
+    [sendButton addTarget:self action:@selector(sendOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _sendButton = sendButton;
+    [sendView addSubview:sendButton];
+}
+
+#pragma mark -- 发送
+- (void)sendOnClick:(UIButton *)button {
+    
+    
+}
+
+#pragma mark -- CustomButton
+- (UIButton *)createCustomButtonWithTitle:(NSString *)title
+{
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.backgroundColor = HOMEBLUECOLOR;
+    button.frame = CGRectMake(0, 0, 80, 30);
+    [button setTitle:title forState:UIControlStateNormal];
+    [button.titleLabel setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:16.0]];
+    [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    button.layer.cornerRadius = 3.0;
+    button.clipsToBounds = YES;
+    
+    return button;
+}
+
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

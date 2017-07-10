@@ -1,0 +1,359 @@
+//
+//  DistLoginValidate.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/27.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "DistLoginValidate.h"
+#import "DeviceInfo.h"
+#import "ValidateManager.h"
+
+@interface DistLoginValidate () <UITextFieldDelegate>
+
+@property (nonatomic,strong) UIToolbar *toolbar;
+@property (nonatomic,strong) UIView *backView;
+@property (nonatomic,strong) UIImageView *logoImage;
+@property (nonatomic,strong) UILabel *nameLabel;/**< 应用名 */
+@property (nonatomic,strong) UITextField *phoneText;/**< 姓名 */
+@property (nonatomic,strong) UITextField *validateText;/**< 验证码 */
+@property (nonatomic,strong) UIView *phoneLine;
+@property (nonatomic,strong) UIView *validateLine;
+@property (nonatomic,strong) UIButton *validateButton;/**< 获取验证码 */
+@property (nonatomic,strong) UIButton *submitButton;/**< 验证设备 */
+
+
+@end
+
+@implementation DistLoginValidate
+
+- (instancetype)initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        //蒙版(自己)
+        self.backgroundColor = [UIColor colorWithRed:37/255.0 green:145/255.0 blue:136/255.0 alpha:1.000];
+        self.backgroundColor = [UIColor clearColor];
+//        self.backgroundColor = [UIColor whiteColor];
+        
+        [self createDistLoginValidate];
+    }
+    return self;
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)screenRotation {
+    
+    _toolbar.frame = CGRectMake(0, 0, self.frame.size.width, self.frame.size.height);
+    _backView.center = CGPointMake(self.frame.size.width/2.0, self.frame.size.height/2.0-60);
+}
+
+- (void)createDistLoginValidate {
+    
+    // 背景
+    UIToolbar *toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.frame.size.width, self.frame.size.height)];
+    toolbar.barStyle = UIBarStyleDefault;
+    toolbar.clipsToBounds = YES;
+    _toolbar = toolbar;
+    [self addSubview:toolbar];
+    
+    CGFloat backView_W = SCREEN_WIDTH > 414 ? 414-60 : self.frame.size.width-60;
+    // 视图背景
+    UIView *backView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, backView_W, 280)];
+//    backView.backgroundColor = [UIColor orangeColor];
+    backView.center = CGPointMake(self.frame.size.width/2.0, self.frame.size.height/2.0-60);
+    _backView = backView;
+    [self addSubview:backView];
+
+    // 同济图标
+    UIImageView *logoImage = [[UIImageView alloc] init];
+    logoImage.frame = CGRectMake(backView.frame.size.width/2.0-30, 0, 60, 60);
+    logoImage.layer.cornerRadius = 2;
+    logoImage.clipsToBounds = YES;
+    logoImage.image = [UIImage imageNamed:@"logo"];
+    _logoImage = logoImage;
+//    [backView addSubview:logoImage];
+    
+    // 同济文字
+    UILabel *nameLabel = [[UILabel alloc] init];
+    nameLabel.frame = CGRectMake(0, 20, backView.frame.size.width, 40);
+    nameLabel.text = @"TJUP微办公";
+    nameLabel.font = [UIFont fontWithName:Font_PingFangSC_Medium size:20.0];
+//    nameLabel.font = [UIFont boldSystemFontOfSize:18.0];
+    nameLabel.textAlignment = NSTextAlignmentCenter;
+    _nameLabel = nameLabel;
+    [backView addSubview:nameLabel];
+    
+    // 手机号
+    UITextField *phoneText = [[UITextField alloc] initWithFrame:CGRectMake(5, CGRectGetMaxY(logoImage.frame)+50, backView.frame.size.width-10, 40)];
+    phoneText.backgroundColor = [UIColor clearColor];
+    phoneText.tintColor = HOMEGREENCOLOR;
+    phoneText.placeholder = @"输入手机号";
+    phoneText.clearButtonMode = UITextFieldViewModeWhileEditing;
+    phoneText.keyboardType = UIKeyboardTypeNumberPad;
+    phoneText.delegate = self;
+    _phoneText = phoneText;
+    [backView addSubview:phoneText];
+    
+    UIView *phoneLine = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(phoneText.frame), backView.frame.size.width, 0.5)];
+    phoneLine.backgroundColor = GRAYCOLOR_MIDDLE;
+    _phoneLine = phoneLine;
+    [backView addSubview:phoneLine];
+    
+    // 验证码
+    UITextField *validateText = [[UITextField alloc] initWithFrame:CGRectMake(5, CGRectGetMaxY(phoneLine.frame)+5, (backView.frame.size.width-10)*0.7, 40)];
+    validateText.backgroundColor = [UIColor clearColor];
+    validateText.tintColor = HOMEGREENCOLOR;
+    validateText.placeholder = @"输入验证码";
+    validateText.clearButtonMode = UITextFieldViewModeWhileEditing;
+    validateText.keyboardType = UIKeyboardTypeNumberPad;
+    validateText.delegate = self;
+    _validateText = validateText;
+    [backView addSubview:validateText];
+    
+    // 获取验证码
+    UIButton *validateButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    validateButton.backgroundColor = HOMEGREENCOLOR;
+    validateButton.layer.cornerRadius = 2;
+    validateButton.clipsToBounds = YES;
+    validateButton.frame = CGRectMake(CGRectGetMaxX(validateText.frame)+5, CGRectGetMaxY(phoneLine.frame)+5, (backView.frame.size.width-10)*0.3, 35);
+    [validateButton setTitle:@"获取验证码" forState:UIControlStateNormal];
+    validateButton.titleLabel.font = [UIFont fontWithName:Font_PingFangSC_Light size:14.0];
+    [validateButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [validateButton addTarget:self action:@selector(validateOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _validateButton = validateButton;
+    [backView addSubview:validateButton];
+    
+    UIView *validateLine = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(validateText.frame), backView.frame.size.width, 0.5)];
+    validateLine.backgroundColor = GRAYCOLOR_MIDDLE;
+    _validateLine = validateLine;
+    [backView addSubview:validateLine];
+    
+    // 验证设备
+    UIButton *submitButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    submitButton.backgroundColor = HOMEGREENCOLOR;
+    submitButton.layer.cornerRadius = 2;
+    submitButton.clipsToBounds = YES;
+    submitButton.frame = CGRectMake(0, CGRectGetMaxY(validateLine.frame)+40, backView.frame.size.width, 40);
+    [submitButton setTitle:@"验证设备" forState:UIControlStateNormal];
+    [submitButton.titleLabel setFont:[UIFont fontWithName:Font_PingFangSC_Light size:17.0]];
+    [submitButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [submitButton addTarget:self action:@selector(submitValidateOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _submitButton = submitButton;
+    [backView addSubview:submitButton];
+    
+}
+
+- (void)showInView:(UIView *)superView animated:(BOOL)animated {
+    
+    [superView addSubview:self];
+    if (animated) {
+        [self fadeIn];
+    }
+}
+
+- (void)fadeIn {
+    /**
+     *  弹出动画
+     */
+    //    self.transform = CGAffineTransformMakeScale(1.3, 1.3);
+    //    self.alpha = 0.0;
+    //    self.backgroundColor = [UIColor clearColor];
+    //    _toolbar.frame = CGRectMake(10, self.frame.size.height, self.frame.size.width-20, 266);
+    self.frame = CGRectMake(0, self.frame.size.height, self.frame.size.width, self.frame.size.height);
+    [UIView animateWithDuration:.35 animations:^{
+        //        self.alpha = 1.0;
+        //        self.transform = CGAffineTransformMakeScale(1, 1);
+        //        self.backgroundColor = [UIColor colorWithRed:0 green:0 blue:0 alpha:0.4];
+        //        _toolbar.frame = CGRectMake(0, 0, self.frame.size.width, self.frame.size.height);
+        self.frame = CGRectMake(0, 0, self.frame.size.width, self.frame.size.height);
+    }];
+}
+
+- (void)fadeOut {
+    /**
+     *  消失动画
+     */
+    //    [UIView animateWithDuration:.45 animations:^{
+    //        //        self.transform = CGAffineTransformMakeScale(1.3, 1.3);
+    //        //        self.alpha = 0.0;
+    //        self.backgroundColor = [UIColor clearColor];
+    //        _toolbar.frame = CGRectMake(10, self.frame.size.height, self.frame.size.width-20, 266);
+    //    } completion:^(BOOL finished) {
+    //        if (finished)
+    //        {
+    //            self.alpha = 1.0;
+    //            [self removeFromSuperview];
+    //        }
+    //    }];
+    [UIView animateWithDuration:.35 animations:^{
+        self.frame = CGRectMake(0, self.frame.size.height, self.frame.size.width, self.frame.size.height);
+        
+    } completion:^(BOOL finished) {
+        if (finished) {
+            [self removeFromSuperview];
+        }
+    }];
+}
+
+#pragma mark -- 获取验证码(倒计时)
+- (void)validateOnClick:(UIButton *)button {
+    
+    if (!self.phoneText.text.length) {
+        [UIView showMessage:@"请输入手机号"];
+        return;
+    }
+    else if (![ValidateManager validateMobile:self.phoneText.text]) {
+        [UIView showMessage:@"输入的手机号不合法"];
+    }
+    else {
+        // 获取验证码
+        [self getMessage];
+    }
+}
+
+#pragma mark -- 获取短信验证码
+- (void)getMessage {
+    
+    NSString *remark = @"remark";
+    NSString *deviceNumber = [DeviceInfo deviceUUID];
+    NSString *system = @"IOS";
+    NSString *hardware = SCREEN_WIDTH > 736 ? @"Pad" : @"Phone" ;
+    NSString *displaySize = [NSString stringWithFormat:@"%f*%f",SCREEN_WIDTH,SCREEN_HEIGHT];
+    NSString *deviceFactory = @"apple";
+    NSString *cpuSeriesNum = @"";
+    NSString *phoneModel = [DeviceInfo deviceModel];
+    NSString *systemVersion = [DeviceInfo deviceSystemVersion];
+    NSString *phoneNumber = _phoneText.text;
+    
+    
+    AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
+//    manager.responseSerializer = [AFHTTPResponseSerializer serializer];
+    manager.requestSerializer = [AFHTTPRequestSerializer serializer];
+    
+    NSString *url = @"http://116.236.160.182:8010/TJMobile/mobile/app-mobileDeviceReg.action";
+    NSDictionary *paremeters = @{@"remark":remark,@"deviceNumber":deviceNumber,@"system":system,@"hardware":hardware,@"displaySize":displaySize,@"deviceFactory":deviceFactory,@"cpuSeriesNum":cpuSeriesNum,@"phoneModel":phoneModel,@"systemVersion":systemVersion,@"phoneNumber":phoneNumber};
+    
+    [manager POST:url parameters:paremeters success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        
+        DLog(@"%@",operation.responseString);
+        if ([[responseObject objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            [self timerCountdown];
+        } else {
+            [UIView showMessage:@"您的信息与人事系统不一致，请联系信息中心13761733252，QQ：150287696"];
+            return ;
+        }
+        
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        [UIView showMessage:@"验证码发送失败"];
+        return ;
+        DLog(@"%@",error);
+    }];
+}
+
+- (void)timerCountdown {
+    
+    __block int timeout = 59; //倒计时时间
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    dispatch_source_t _timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,queue);
+    dispatch_source_set_timer(_timer,dispatch_walltime(NULL, 0),1.0*NSEC_PER_SEC, 0); //每秒执行
+    dispatch_source_set_event_handler(_timer, ^{
+        if (timeout <= 0) { //倒计时结束，关闭
+            dispatch_source_cancel(_timer);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                //设置界面的按钮显示 根据自己需求设置
+                [_validateButton setTitle:@"重新获取" forState:UIControlStateNormal];
+                _validateButton.userInteractionEnabled = YES;
+            });
+        } else {
+            int seconds = timeout % 60;
+            NSString *time = [NSString stringWithFormat:@"%.2d", seconds];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // 设置界面的按钮显示 根据自己需求设置
+                //                NSLog(@"____%@",time);
+                [UIView beginAnimations:nil context:nil];
+                [UIView setAnimationDuration:1];
+                [_validateButton setTitle:[NSString stringWithFormat:@"%@秒重发",time] forState:UIControlStateNormal];
+                [UIView commitAnimations];
+                _validateButton.userInteractionEnabled = NO;
+            });
+            timeout--;
+        }
+    });
+    dispatch_resume(_timer);
+}
+
+#pragma mark -- 验证设备
+- (void)submitValidateOnClick:(UIButton *)button {
+    
+    AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
+    //    manager.responseSerializer = [AFHTTPResponseSerializer serializer];
+    manager.requestSerializer = [AFHTTPRequestSerializer serializer];
+    // 孙佳IP:http://192.168.2.166:8080/
+    // 包飞龙IP:http://192.168.5.105:8080/
+    NSString *url = [NSString stringWithFormat:@"http://116.236.160.182:8010/TJMobile/mobile/app-validateByMessage.action?validateCode=%@",_validateText.text];
+    
+    [manager GET:url parameters:nil success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        
+        DLog(@"%@",responseObject);
+        if ([[responseObject objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            KeychainItemWrapper *keychainItem = [[KeychainItemWrapper alloc] initWithIdentifier:@"com.dist.TJYD.deviceValidate" accessGroup:nil];
+            [keychainItem setObject:@"deviceValidate" forKey:(__bridge id)kSecAttrAccount];
+            [keychainItem setObject:@"true" forKey:(__bridge id)kSecValueData];
+            [UIView showMessage:@"您的设备验证成功"];
+            [self fadeOut];
+            
+        } else {
+            [UIView showMessage:@"验证码不正确"];
+        }
+        
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        [UIView showMessage:@"验证失败"];
+        DLog(@"%@",error);
+    }];
+}
+
+#pragma mark -- textFieldDelegate
+- (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
+    if (textField == _validateText) {
+        
+        if (string.length == 0) {
+            return YES;
+        }
+        NSInteger existedLength = textField.text.length;
+        NSInteger selectedLength = range.length;
+        NSInteger replaceLength = string.length;
+        // 限制最大输入长度为4
+        if (existedLength - selectedLength + replaceLength > 6) {
+            return NO;
+        }
+    } else if (textField == _phoneText) {
+        
+        if (string.length == 0) {
+            return YES;
+        }
+        NSInteger existedLength = textField.text.length;
+        NSInteger selectedLength = range.length;
+        NSInteger replaceLength = string.length;
+        // 限制最大输入长度为11
+        if (existedLength - selectedLength + replaceLength > 11) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    
+    [self endEditing:YES];
+}
+
+- (void)removeFromSuperview{
+    [super removeFromSuperview];
+    
+}
+
+@end

@@ -1,0 +1,390 @@
+//
+//  SignViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/5/4.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "SignViewController.h"
+#import "FormSingleLogin.h"
+#import "SendViewController.h"
+#import "BackViewController.h"
+#import <JavaScriptCore/JavaScriptCore.h>
+
+@protocol JSObjcDelegate <JSExport>
+
+// 获取反馈状态(前端返回)
+- (void)getStatus:(NSString *)statusInfo;
+
+// -- 处理发走多个表单的情况(缓存) --
+// 注销(移除)表单
+- (void)removeCoach;
+
+// 加载完整表单
+- (void)loadWholeForm ;
+// 加载意见表单
+- (void)loadAdviceForm;
+
+// 保存意见表单
+- (void)postSaveAdviceFormMessage;
+// 保存完整表单
+- (void)postSaveWholeFormMessage;
+
+// 验证意见表单
+- (void)postValidateAdviceFormMessage;
+// 验证完整表单
+- (void)postValidateWholeFormMessage;
+
+// 发送意见表单
+- (void)postSendAdviceFormMessage;
+// 发送完整表单
+- (void)postSendWholeFormMessage;
+
+@end
+
+@interface SignViewController () <UIWebViewDelegate,JSObjcDelegate>
+
+@property (nonatomic,strong) UIView *sendView;
+@property (nonatomic,strong) UIView *sendline;
+@property (nonatomic,strong) UIButton *saveButton;//保存
+@property (nonatomic,strong) UIButton *sendButton;//发送
+@property (nonatomic,strong) NSMutableArray *dataArray;//数据源
+@property (nonatomic,strong) NSArray *selectArray;//选择人员数据源
+@property (nonatomic,strong) NSArray *dictUserArray;
+@property (nonatomic,weak) UIWebView *web;
+@property (nonatomic,strong) JSContext *jsContext;
+
+@end
+
+@implementation SignViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+}
+
+- (void)dealloc {
+    // 移除通知和监听
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    //[[self.view removeObserver:self forKeyPath:@"frame" context:nil];
+    
+    //清除webView的缓存
+    [[NSURLCache sharedURLCache] removeAllCachedResponses];
+    [_web removeFromSuperview];
+    _web = nil;
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"审核"];
+    
+    [self creatSendButton];
+    [self loadWebForm];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(saveSendUsersSuccess:) name:@"saveSendUsersSuccess" object:nil];
+    // 监听屏幕旋转
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(screenRotation:) name:UIApplicationWillChangeStatusBarOrientationNotification object:nil];
+    // 监听移除coach表单的通知(ProjectDetailVC<ProjectInfo>发出)
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(removeCoach:) name:@"removeCoach" object:nil];
+    
+}
+
+- (void)removeCoach:(NSNotification *)noty {
+    
+    [self removeCoach];
+}
+
+#pragma mark -- 收到保存发送人员成功的通知
+- (void)saveSendUsersSuccess:(NSNotification *)noty {
+    
+    [self postSendWholeFormMessage];
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotation:(NSNotification *)noty {
+    
+    _sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    _sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    // 保存,发送,回退
+    CGFloat btn_W = (SCREEN_WIDTH-30)/2;
+    _saveButton.frame = CGRectMake(10, 10, btn_W, 40);
+    _sendButton.frame = CGRectMake(CGRectGetMaxX(_saveButton.frame)+10, _saveButton.frame.origin.y, btn_W, 40);
+}
+
+- (void)creatSendButton {
+    
+    UIView *sendView = [[UIView alloc] init];
+    sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    sendView.backgroundColor = [UIColor whiteColor];
+    _sendView = sendView;
+    [self.view addSubview:sendView];
+    
+    UIView *sendline = [[UIView alloc] init];
+    sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    sendline.backgroundColor = GRAYCOLOR_MIDDLE;
+    _sendline = sendline;
+    [sendView addSubview:sendline];
+    
+    // 保存,发送
+    CGFloat btn_W = (SCREEN_WIDTH-30)/2;
+    
+    UIButton *saveButton = [self createCustomButtonWithTitle:@"暂存"];
+    saveButton.frame = CGRectMake(10, 10, btn_W, 40);
+    //    saveButton.enabled = NO;
+    //    saveButton.backgroundColor = [UIColor lightGrayColor];
+    [saveButton addTarget:self action:@selector(saveOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _saveButton = saveButton;
+    [sendView addSubview:saveButton];
+    
+    UIButton *sendButton = [self createCustomButtonWithTitle:@"发送"];
+    sendButton.frame = CGRectMake(CGRectGetMaxX(saveButton.frame)+10, saveButton.frame.origin.y, btn_W, 40);
+    sendButton.enabled = NO;
+    sendButton.backgroundColor = [UIColor lightGrayColor];
+    [sendButton addTarget:self action:@selector(sendOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _sendButton = sendButton;
+    [sendView addSubview:sendButton];
+}
+
+#pragma mark -- 保存
+- (void)saveOnClick:(UIButton *)button {
+    
+    [self postSaveAdviceFormMessage];
+    [self postValidateAdviceFormMessage];
+}
+
+#pragma mark -- 发送
+- (void)sendOnClick:(UIButton *)button {
+    
+    [self postSaveAdviceFormMessage];
+    [self postValidateAdviceFormMessage];
+    
+    SendViewController *sendVC = [[SendViewController alloc] init];
+    sendVC.listModel = self.listModel;
+    sendVC.navi = self.navi;
+    
+    [self pushToViewControllerWithTransition:sendVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navi];
+}
+
+#pragma mark -- 加载网页表单
+- (void)loadWebForm {
+    
+    if (!_web) {
+        UIWebView *web = [[UIWebView alloc] init];
+        web.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-60);
+        web.delegate = self;
+        web.backgroundColor = [UIColor whiteColor];
+        //    web.scalesPageToFit = YES;
+        _web = web;
+        [self.view addSubview:web];
+        [self.view bringSubviewToFront:web];
+        
+    }
+    [MBProgressHUD showMessage:@"" toView:_web];
+    //加载请求的时候忽略缓存
+    //[_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/proxy.html"] cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:5.0]];
+    [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/proxy.html"]]];
+    
+    // 表单单点登录
+    /*
+     [FormSingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+     if (success) {
+     // 登录成功
+     NSString *URL = [NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=%@&iscontractagent=是",_listModel.TASK_ID];
+     // 4.表单信息
+     [DamNetworkingManager GETWithUrl:URL andHttpHeader:nil andSuccess:^(NSData *data, NSURLResponse *response) {
+     
+     NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+     NSLog(@"responseString4:%@",responseString);
+     //                NSHTTPURLResponse *Response  = (NSHTTPURLResponse *)response;
+     //[_web loadRequest:[NSURLRequest requestWithURL:Response.URL]];
+     //                [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/mobileForm.html"]]];
+     [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/proxy.html"]]];
+     
+     } andFailBlock:^(NSError *error) {
+     
+     }];
+     
+     } else {
+     // 登录失败
+     }
+     }];
+     */
+    
+}
+
+#pragma mark - UIWebViewDelegate
+-(void)webViewDidFinishLoad:(UIWebView *)webView {
+    
+    self.jsContext = [webView valueForKeyPath:@"documentView.webView.mainFrame.javaScriptContext"];
+    self.jsContext[@"Dist"] = self;
+    
+    self.jsContext.exceptionHandler = ^(JSContext *context, JSValue *exceptionValue) {
+        context.exception = exceptionValue;
+        NSLog(@"异常信息：%@", exceptionValue);
+    };
+    
+    //***************
+    
+    [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:@"WebKitCacheModelPreferenceKey"];
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"WebKitDiskImageCacheEnabled"];//自己添加的，原文没有提到。
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"WebKitOfflineWebApplicationCacheEnabled"];//自己添加的，原文没有提到。
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
+    //***************
+}
+
+#pragma mark - JSObjcDelegate
+#pragma mark -- 状态回调
+- (void)getStatus:(NSString *)statusInfo {
+    NSLog(@"statusInfo:%@", statusInfo);
+    // 分享成功回调js的方法shareCallback
+    //    JSValue *shareCallback = self.jsContext[@"getStatus"];
+    //    [shareCallback callWithArguments:nil];
+    
+    NSData *data = [statusInfo dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *JsonDic = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil];
+    NSLog(@"JsonDic:%@",[JsonDic objectForKey:@"status"]);
+    
+    if ([[JsonDic objectForKey:@"status"] isEqual:@1]) {
+        
+        [self loadWholeForm];
+        [self loadAdviceForm];
+        //        [self postSaveAdviceFormMessage];
+        //        [self postValidateAdviceFormMessage];
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@2]) {
+        
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@3]) {
+        
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@4]) {
+        NSLog(@"完整表单加载完毕");
+        //        [self postSaveWholeFormMessage];
+        //        [self postValidateWholeFormMessage];
+        //        [self postSaveAdviceFormMessage];
+        //        [self postValidateAdviceFormMessage];
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@5]) {
+        NSLog(@"意见表单表单加载完毕");
+        [MBProgressHUD hideHUDForView:_web animated:NO];
+        [self postSaveAdviceFormMessage];
+        [self postValidateAdviceFormMessage];
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@6]) {
+        //        NSLog(@"保存完整表单");
+        //        [self postSaveAdviceFormMessage];
+        //        [self postValidateAdviceFormMessage];
+        
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@7]) {
+        //        NSLog(@"保存意见表单");
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@8]) {
+        //        NSLog(@"验证意见表单成功");
+        
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@9]) {
+        //        NSLog(@"验证完整表单成功");
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@14]) {
+        // 意见表单验证结果false
+        _sendButton.enabled = NO;
+        _sendButton.backgroundColor = [UIColor lightGrayColor];
+    } else if ([[JsonDic objectForKey:@"status"] isEqual:@15]) {
+        // 意见表单验证结果true
+        NSLog(@"意见表单验证结果true");
+        _sendButton.enabled = YES;
+        _sendButton.backgroundColor = HOMEBLUECOLOR;
+    }
+}
+
+// ----------
+
+// -- 处理发走多个表单的情况(缓存) --
+// 注销(移除)表单
+- (void)removeCoach {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"removeCoach"];
+    [picCallback callWithArguments:nil];
+}
+
+// 加载完整表单
+- (void)loadWholeForm {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"loadWholeForm"];
+    [picCallback callWithArguments:@[[NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=%@&iscontractagent=是",_listModel.TASK_ID]]];
+}
+// 加载意见表单
+- (void)loadAdviceForm {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"loadAdviceForm"];
+    DLog(@"adviceForm:%@",[NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/executeServiceByName?processApp=TJYSOA1&serviceName=signature&tw.local.PIID=%@&tw.local.processName=%@&tw.local.activityName=%@",_listModel.INSTANCEID,_listModel.BUSINESSNAME,_listModel.ACTIVITY_NAME]);
+    [picCallback callWithArguments:@[[NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/executeServiceByName?processApp=TJYSOA1&serviceName=signature&tw.local.PIID=%@&tw.local.processName=%@&tw.local.activityName=%@",_listModel.INSTANCEID,_listModel.BUSINESSNAME,_listModel.ACTIVITY_NAME]]];
+}
+// 保存意见表单
+- (void)postSaveAdviceFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postSaveAdviceFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+// 保存完整表单
+- (void)postSaveWholeFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postSaveWholeFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+
+// 验证意见表单
+- (void)postValidateAdviceFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postValidateAdviceFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+// 验证完整表单
+- (void)postValidateWholeFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postValidateWholeFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+
+// 发送意见表单
+- (void)postSendAdviceFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postSendAdviceFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+// 发送完整表单
+- (void)postSendWholeFormMessage {
+    // 获取到验证之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"postSendWholeFormMessage"];
+    [picCallback callWithArguments:nil];
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+#pragma mark -- CustomButton
+- (UIButton *)createCustomButtonWithTitle:(NSString *)title {
+    
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.backgroundColor = HOMEBLUECOLOR;
+    button.frame = CGRectMake(0, 0, 80, 30);
+    [button setTitle:title forState:UIControlStateNormal];
+    [button.titleLabel setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:16.0]];
+    [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    button.layer.cornerRadius = 3.0;
+    button.clipsToBounds = YES;
+    
+    return button;
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

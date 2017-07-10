@@ -1,0 +1,30 @@
+//
+//  DistNetInterface.h
+//  TJYD
+//
+//  Created by apple on 2017/4/1.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#ifndef DistNetInterface_h
+#define DistNetInterface_h
+
+//定义接口的请求环境 正式环境or测试环境
+
+#define TEST 1
+
+#if TEST
+//测试接口
+#define NetEnvironment @"http://58.246.138.178:8105/"
+//#define NetEnvironment @"http://58.246.138.178:8081/"
+//#define NetEnvironment @"http://192.168.15.39:8080/"
+
+
+#else
+//正式接口
+#define NetEnvironment @"http://58.246.138.178:8081/"
+
+
+#endif
+
+#endif /* DistNetInterface_h */

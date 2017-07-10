@@ -1,0 +1,490 @@
+//
+//  SendViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/28.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "SendViewController.h"
+#import "SendTreeView.h"
+#import "SendPeopleCellModel.h"
+#import "SendModel.h"
+#import <JavaScriptCore/JavaScriptCore.h>
+
+@protocol JSObjcDelegate <JSExport>
+
+// 设置表单url
+- (void)setUrl;
+// 获取状态
+- (void)getStatus:(NSString *)statusInfo;
+// 保存签字
+- (void)saveForm;
+// 发送表单
+- (void)sendForm;
+
+- (void)submit;
+
+@end
+
+@interface SendViewController () <TreeDelegate,UIWebViewDelegate,JSObjcDelegate>
+
+@property (nonatomic,strong) SendTreeView *sendTreeView;
+@property (nonatomic,strong) UIView *sendView;
+@property (nonatomic,strong) UIView *sendline;
+@property (nonatomic,strong) UIButton *sendButton;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,strong) NSArray *dictUserArray;
+@property (nonatomic,strong) UIWebView *web;
+@property (nonatomic,strong) JSContext *jsContext;
+
+@end
+
+@implementation SendViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"发送给"];
+    
+    [self creatSendButton];
+    [self loadData];
+    [self loadWebForm];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    
+    _sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    _sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    _sendButton.frame = CGRectMake(_sendView.frame.size.width/2-250/2, 10, 250, 40);
+    _sendTreeView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-60);
+    [_sendTreeView screenRotation];
+}
+
+- (void)loadData {
+    
+    _dataArray = [NSMutableArray array];
+    
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 获取发送人员列表
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==send/getActivities.do?projectId=%@&taskId=%@,%@",_listModel.PID,_listModel.TASK_ID,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetActivities requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            
+            NSArray *children = [[JsonDic objectForKey:@"result"] objectForKey:@"children"];
+            
+            SendTreeView *treeView = [[SendTreeView instanceView] initTreeWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-60) dataArray:children haveHiddenSelectBtn:NO haveHeadView:NO isEqualX:NO];
+            treeView.delegate = self;
+            treeView.backgroundColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1.0];
+            treeView.backgroundColor = [UIColor whiteColor];
+            _sendTreeView = treeView;
+            [self.view addSubview:treeView];
+            
+            
+            for (NSDictionary *dic in children) {
+                SendModel *sendModel = [[SendModel alloc] initWithDictionary:dic];
+                [_dataArray addObject:sendModel];
+            }
+            DLog(@"SendModel:%@",_dataArray);
+            
+            // Model array -> JSON array
+//            NSArray *dictUserArray = [SendModel mj_keyValuesArrayWithObjectArray:_dataArray];
+//            NSString *string = [dictUserArray componentsJoinedByString:@";"];//为分隔符
+//            DLog(@"dictArray:%@", dictUserArray);
+//            DLog(@"string:%@", string);
+            
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- SendTreeViewDelegate
+- (void)itemSelectInfo:(SendPeopleCellModel *)item {
+    
+    DLog(@"DamPeopleCellModel::%@",item);
+//    SendPeopleCellModel *peopleModel = item;
+}
+
+- (void)itemSelectArray:(NSArray *)selectArray {
+    
+    if (selectArray.count) {
+        
+        self.sendButton.enabled = YES;
+        self.sendButton.backgroundColor = HOMEBLUECOLOR;
+        
+        for (NSInteger i=0; i<selectArray.count; i++) {
+            
+            // 选择人员的Id
+            NSString *Id = [selectArray[i] objectForKey:@"id"];
+            
+            for (NSInteger j=0; j<_dataArray.count; j++) {
+                SendModel *sendModel = _dataArray[j];
+                for (SendListModel *sendListModel in sendModel.children) {
+                    if ([sendListModel.Id isEqualToString:Id]) {
+                        sendListModel.selected = @"true";
+                        sendListModel._parentId = sendModel.Id;
+                        sendModel.selected = @"true";
+                    }
+                }
+            }
+        }
+        
+        for (NSInteger i=0; i<_dataArray.count; i++) {
+            
+            SendModel *sendModel = _dataArray[i];
+            
+            for (NSInteger j=sendModel.children.count-1; j>=0; j--) {
+                SendListModel *sendListModel = sendModel.children[j];
+                if (![sendListModel.selected isEqualToString:@"true"]) {
+                    [sendModel.children removeObject:sendListModel];
+                }
+            }
+        }
+        DLog(@"SiftArr%@",_dataArray);
+
+        // Model array -> JSON array
+        NSArray *dictUserArray = [SendModel mj_keyValuesArrayWithObjectArray:_dataArray];
+        DLog(@"dictArray:%@", dictUserArray);
+        _dictUserArray = dictUserArray;
+        
+    } else {
+        
+        self.sendButton.enabled = NO;
+        self.sendButton.backgroundColor = [UIColor lightGrayColor];
+    }
+    NSLog(@"SendSelectArray::%@",selectArray);
+}
+
+- (void)creatSendButton {
+    
+    UIView *sendView = [[UIView alloc] init];
+    sendView.frame = CGRectMake(0, SCREEN_HEIGHT-64-60, SCREEN_WIDTH, 60);
+    sendView.backgroundColor = [UIColor whiteColor];
+    _sendView = sendView;
+    [self.view addSubview:sendView];
+    
+    UIView *sendline = [[UIView alloc] init];
+    sendline.frame = CGRectMake(0, 0, SCREEN_WIDTH, 0.5);
+    sendline.backgroundColor = GRAYCOLOR_MIDDLE;
+    _sendline = sendline;
+    [sendView addSubview:sendline];
+    
+    UIButton *sendButton = [self createCustomButtonWithTitle:@"完 成"];
+    sendButton.frame = CGRectMake(sendView.frame.size.width/2-250/2, 10, 250, 40);
+    sendButton.enabled = NO;
+    sendButton.backgroundColor = [UIColor lightGrayColor];
+    [sendButton addTarget:self action:@selector(sendOnClick:) forControlEvents:UIControlEventTouchUpInside];
+    _sendButton = sendButton;
+    [sendView addSubview:sendButton];
+}
+
+#pragma mark -- 发送
+- (void)sendOnClick:(UIButton *)button {
+    
+    if (_dictUserArray.count) {
+        // 发送(保存人员)
+//        [MBProgressHUD showMessage:@"正在发送" toView:self.view];
+        
+        NSString *userString = [NSString stringWithFormat:@"%@",_dictUserArray];
+        userString = [userString stringByReplacingOccurrencesOfString:@"Id" withString:@"id"];
+        userString = [userString stringByReplacingOccurrencesOfString:@"Override" withString:@"override"];
+        //其中 ; 分号必须是 隔断字符串 的分隔符。否则 ; 就要更改成对应的 分隔符
+//        NSArray *array = [userString componentsSeparatedByString:@";"];
+        
+        /**
+         *  submit
+         */
+//        [self submit];
+        
+//        userString = [userString stringByReplacingOccurrencesOfString:@" " withString:@""];
+//        userString = [userString stringByReplacingOccurrencesOfString:@"\n" withString:@""];
+//        userString = [userString stringByReplacingOccurrencesOfString:@";" withString:@","];
+        
+        
+        //
+        NSMutableArray *selectData = [NSMutableArray array];
+//        NSMutableDictionary *dic = [NSMutableDictionary dictionary];
+//        [dic setValue:@"111" forKey:@"1"];
+//        [selectData addObject:dic];
+        SendModel *sendModel = [_dataArray firstObject];
+        SendListModel *listModel = [sendModel.children firstObject];
+        NSString *user1 = @"{\"1\":\"111\"}";
+        user1 = [NSString stringWithFormat:@"{\"%@\":\"%@\"}",sendModel.Id,listModel.Id];
+        DLog(@"user1:%@",user1);
+        [selectData addObject:user1];
+//        NSMutableDictionary *dic2 = [NSMutableDictionary dictionary];
+//        [dic2 setValue:@"222" forKey:@"2"];
+//        [selectData addObject:dic2];
+        
+        NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+        NSString *encryptDes = [NSString stringWithFormat:@"action==send/saveSelectUsers.do?activityName=%@&projectId=%@&taskId=%@&selectData=%@,%@",_listModel.ACTIVITY_NAME,_listModel.PID,_listModel.TASK_ID,user1,ticket];
+
+        DLog(@"jiamizhiqian:%@",encryptDes);
+        NSUInteger bytes = [encryptDes lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        
+        
+//        NSString *des = [DES encryptUseDES:[encryptDes stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+        NSString *des = [DES encryptUseDES:encryptDes key:Key];
+        DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetSaveSelectUsers requestMethod:DistRequestMethodPost arguments:nil];
+        [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+            
+            NSDictionary *JsonDic = request.responseJSONObject;
+            
+            if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+                
+                DLog(@"send::success");
+                //
+                // 定时
+                [self performSelector:@selector(Send) withObject:nil afterDelay:5];
+                
+            } else {
+                // 单点登录超时(sessionTimeOut)
+                [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                }];
+            }
+            // 加载提示框
+            [MBProgressHUD hideHUDForView:self.view animated:NO];
+        } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+            [MBProgressHUD hideHUDForView:self.view animated:NO];
+        }];
+    }
+}
+
+- (void)loadWebForm {
+    
+    UIWebView *web = [[UIWebView alloc] init];
+    web.frame = CGRectMake(0, SCREEN_HEIGHT-150, 100, 200);
+    web.delegate = self;
+    web.backgroundColor = [UIColor orangeColor];
+    web.scalesPageToFit = YES;
+    _web = web;
+    [self.view addSubview:web];
+    [self.view bringSubviewToFront:web];
+    
+    // 1.
+//    NSString *url = @"http://116.236.160.182:9083/sso/login?service=http://116.236.160.182:9081/teamworks/fauxRedirect.lsw";
+//    //    url = @"http://116.236.160.182:9083/sso/login?service=http://192.168.15.16:8080/dist/views/mobileForm.html";
+//    [DamNetworkingManager GETWithUrl:url andHttpHeader:nil andSuccess:^(NSData *data,NSURLResponse *response) {
+//        NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//        //        NSLog(@"responseString1:%@",responseString);
+//        
+//        TFHpple *Hpple = [[TFHpple alloc]initWithHTMLData:data];
+//        NSArray *array1 =[Hpple searchWithXPathQuery:@"//input"];
+//        TFHppleElement *hppleElement = array1[2];
+//        NSArray *arr = [hppleElement.raw.description componentsSeparatedByString:@"\""];
+//        NSString *lt = arr[arr.count - 2];
+//        NSLog(@"lt::%@",arr[arr.count - 2]);
+//        TFHppleElement *hppleElement2 = array1[3];
+//        NSArray *arr2 = [hppleElement2.raw.description componentsSeparatedByString:@"\""];
+//        NSString *execution = arr2[arr2.count - 2];
+//        NSLog(@"execution::%@",arr2[arr2.count - 2]);
+//        
+//        // 2.
+//        NSHTTPURLResponse *Response = (NSHTTPURLResponse *)response;
+//        NSDictionary *dic = [Response allHeaderFields];
+//        NSArray *cookieArr = [[dic objectForKey:@"Set-Cookie"] componentsSeparatedByString:@";"];
+//        NSString *Cookie1 = [cookieArr firstObject];
+//        NSLog(@"Cookie1::%@",Cookie1);
+//        
+//        NSDictionary *parameters = @{@"username":@"wangying",@"password":@"1",@"lt":lt,@"execution":execution,@"_eventId":@"submit",@"submit":@"登录"};
+//        NSDictionary *headerDic = @{@"Content-Type":@"application/x-www-form-urlencoded",@"Connection":@"keep-alive",@"Cookie":Cookie1};
+//        NSString *paraStr = [NSString stringWithFormat: @"username=wangying&password=1&lt=%@&execution=%@&_eventId=submit&submit=登录",lt,execution];
+//        
+//        [DamNetworkingManager POSTWithUrl:url andBodyDic:nil andBodyStr:paraStr andHttpHeader:headerDic andSuccess:^(NSData *data, NSURLResponse *response) {
+//            NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//            NSLog(@"responseString2:%@",responseString);
+//            NSLog(@"response2::%@",response);
+//            
+//            NSDictionary *dic = [(NSHTTPURLResponse *)response allHeaderFields];
+//            NSLog(@"Location2:%@",dic[@"Location"]);
+//            
+//            NSString *CASTGC = dic[@"Set-Cookie"];
+//            //                NSDictionary *headerDic = @{@"Content-Type":@"application/x-www-form-urlencoded",@"Connection":@"keep-alive",@"Cookie":Cookie};
+//            NSDictionary *headerDic = @{@"Connection":@"keep-alive"};
+//            // 3.
+//            [DamNetworkingManager GETWithUrl:dic[@"Location"] andHttpHeader:headerDic andSuccess:^(NSData *data, NSURLResponse *response) {
+//                NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//                NSLog(@"responseString3:%@",responseString);
+//                
+//                NSHTTPURLResponse *Response  = (NSHTTPURLResponse *)response;
+//                NSDictionary *dic = [Response allHeaderFields];
+//                NSArray *cookieArr = [[dic objectForKey:@"Set-Cookie"] componentsSeparatedByString:@";"];
+//                NSString *Cookie = [cookieArr firstObject];
+//                NSLog(@"Cookie3::%@",Cookie);
+//                NSString *Cookies = [NSString stringWithFormat:@"%@;%@",[dic objectForKey:@"Set-Cookie"],CASTGC];
+//                NSDictionary *headerDic = @{@"Cookie":[dic objectForKey:@"Set-Cookie"]};
+//                headerDic = @{@"Cookie":Cookies,@"Connection":@"keep-alive",@"Accept-Encoding":@"gzip, deflate, sdch"};
+//                
+//                NSString *URL = @"http://116.236.160.182:9083/AppCenter/noticeInfo/getAllNoticeList.do?noticeStyle=YNXW&pageIndex=1&pageSize=15&queryFilter=";
+//                URL = @"http://116.236.160.182:9085/teamworks/fauxRedirect.lsw?coachDebugTrace=none&applicationInstanceId=null&zTaskId=t449&zComponentId=3028.877483f6-21a6-46cb-98a6-fd7554b720ca&zWorkflowState=2&zComponentName=CoachNG&zDbg=0&applicationId=1#%20%20";
+//                URL = @"http://116.236.160.182:9085/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=449&iscontractagent=是";
+//                URL = @"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=1660&iscontractagent=是";
+//                URL = @"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=2405&iscontractagent=是";
+//                URL = [NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=%@&iscontractagent=是",_listModel.TASK_ID];
+//            
+//
+//                
+//                //                URL = @"https://172.16.31.107:9444/teamworks/executeServiceByName?processApp=TJYSOA1&serviceName=signature&PIId=829&processName=投标信息登记&activityName=一审";
+//                //                [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://192.168.15.16:8080/dist/views/mobileForm.html"]]];
+//                //                NSDictionary *headerDic = @{@"Connection":@"keep-alive",@"Cookie":Cookie};
+//                //                [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9085/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=449&iscontractagent=是"]]];
+//                // 4.表单信息
+//                [DamNetworkingManager GETWithUrl:URL andHttpHeader:headerDic andSuccess:^(NSData *data, NSURLResponse *response) {
+//                    NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//                    NSLog(@"responseString4:%@",responseString);
+//                    NSDictionary *userInfo = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil];
+//                    NSHTTPURLResponse *Response  = (NSHTTPURLResponse *)response;
+////                      [_web loadRequest:[NSURLRequest requestWithURL:Response.URL]];
+//                    [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/mobileForm.html"]]];
+////                    [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"http://116.236.160.182:9083/AppCenter/dist/views/mobileForm.html"]]];
+//                    
+//                } andFailBlock:^(NSError *error) {
+//                }];
+//            } andFailBlock:^(NSError *error) {
+//            }];
+//        } andFailBlock:^(NSError *error) {
+//        }];
+//    } andFailBlock:^(NSError *error) {
+//    }];
+}
+
+#pragma mark - UIWebViewDelegate
+
+-(void)webViewDidFinishLoad:(UIWebView *)webView {
+    self.jsContext = [webView valueForKeyPath:@"documentView.webView.mainFrame.javaScriptContext"];
+    self.jsContext[@"Dist"] = self;
+    
+    //    [self callCamera];
+    //    [self setUrl];
+    self.jsContext.exceptionHandler = ^(JSContext *context, JSValue *exceptionValue) {
+        context.exception = exceptionValue;
+        NSLog(@"异常信息：%@", exceptionValue);
+    };
+    
+}
+
+#pragma mark - JSObjcDelegate
+
+- (void)setUrl {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"setUrl"];
+    //    [picCallback callWithArguments:@[@"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=1660&iscontractagent=是"]];
+    [picCallback callWithArguments:@[[NSString stringWithFormat:@"http://116.236.160.182:9081/teamworks/fauxRedirect.lsw?zWorkflowState=1&coachDebugTrace=none&zResetContext=true&zTaskId=%@&iscontractagent=是",_listModel.TASK_ID]]];
+    // projectId( PID = 1669 ),  taskId (2405)
+    
+}
+
+- (void)Send {
+    [self sendForm];
+}
+
+#pragma mark -- 状态回调
+- (void)getStatus:(NSString *)statusInfo {
+    NSLog(@"statusInfo:%@", statusInfo);
+    // 分享成功回调js的方法shareCallback
+    //    JSValue *shareCallback = self.jsContext[@"getStatus"];
+    //    [shareCallback callWithArguments:nil];
+    
+    NSData *data = [statusInfo dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *JsonDic = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil];
+    NSLog(@"JsonDic:%@",[JsonDic objectForKey:@"status"]);
+    
+    if ([[JsonDic objectForKey:@"status"] isEqualToString:@"1"]) {
+        [self setUrl];
+    } else if ([[JsonDic objectForKey:@"status"] isEqualToString:@"2"]) {
+        NSLog(@"表单加载成功");
+        [self saveForm];
+    } else if ([[JsonDic objectForKey:@"status"] isEqualToString:@"3"]) {
+        NSLog(@"保存意见成功");
+//        [self sendForm];
+    } else if ([[JsonDic objectForKey:@"status"] isEqualToString:@"4"]) {
+        NSLog(@"表单验证成功");
+        
+    } else if ([[JsonDic objectForKey:@"status"] isEqualToString:@"5"]) {
+        NSLog(@"表单发送成功");
+    }
+}
+
+// 保存签字
+- (void)saveForm {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"saveForm"];
+    [picCallback callWithArguments:nil];
+}
+// 发送表单
+- (void)sendForm {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"sendForm"];
+    [picCallback callWithArguments:nil];
+}
+
+- (void)submit {
+    // 获取到照片之后在回调js的方法picCallback把图片传出去
+    JSValue *picCallback = self.jsContext[@"submit"];
+    [picCallback callWithArguments:@[_dictUserArray]];
+//    [picCallback callWithArguments:nil];
+}
+
+#pragma mark -- CustomButton
+- (UIButton *)createCustomButtonWithTitle:(NSString *)title
+{
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.backgroundColor = HOMEBLUECOLOR;
+    button.frame = CGRectMake(0, 0, 80, 30);
+    [button setTitle:title forState:UIControlStateNormal];
+    [button.titleLabel setFont:[UIFont fontWithName:Font_PingFangSC_Regular size:16.0]];
+    [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    button.layer.cornerRadius = 3.0;
+    button.clipsToBounds = YES;
+    
+    return button;
+}
+
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

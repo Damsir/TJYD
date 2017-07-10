@@ -1,0 +1,110 @@
+//
+//  DistServiceAPI.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/6.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "DistServiceAPI.h"
+
+@implementation DistServiceAPI {
+    
+    NSString          * _des;
+    NSDictionary      * _arguments;
+    DistRequestMethod   _requestMethod;
+    
+}
+
+- (instancetype)initWithDes:(NSString *)des DistServiceActionType:(DistServiceActionType)actionType requestMethod:(DistRequestMethod)requestMethod arguments:(NSDictionary *)arguments{
+    self = [super init];
+    if (self) {
+        _des           = des;
+        _actionType    = actionType;
+        _requestMethod = requestMethod;
+        _arguments     = arguments;
+    }
+    return self;
+}
+
+- (DistRequestMethod)requestMethod {
+    
+    return _requestMethod;
+}
+
+- (NSString *)requestUrl {
+    
+    switch (_actionType) {
+            /** 单点登录 */
+        case DistServiceActionTypeSingleLogin:
+            return [NSString stringWithFormat:@"MobileService/single/signOn.do?params=%@",_des];
+            break;
+            /** 用户信息 */
+        case DistServiceActionTypeGetUserInfo:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getUserInfo.do?params=%@",_des];
+            break;
+            /** 通讯录 */
+        case DistServiceActionTypeGetContacts:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getOrgAndUser.do?params=%@",_des];
+            break;
+            /** 注销 */
+        case DistServiceActionTypeSingleLoginOut:
+            return [NSString stringWithFormat:@"MobileService/single/signOut.do?params=%@",_des];
+            break;
+            /** 修改密码 */
+        case DistServiceActionTypeGetPasswordModify:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getPasswordModify.do?params=%@",_des];
+            break;
+            /** 院内新闻,通知公告,院发文件 */
+        case DistServiceActionTypeGetAllNoticeList:
+            return [NSString stringWithFormat:@"MobileService/allNoticeList/getAllNoticeList.do?params=%@",_des];
+            break;
+            /** 待办事项(项目) */
+        case DistServiceActionTypeGetProcessingList:
+            return [NSString stringWithFormat:@"MobileService/processingList/getProcessingList.do?params=%@",_des];
+            break;
+            /** 表单详情(待办事项) */
+        case DistServiceActionTypeGetForm:
+            return [NSString stringWithFormat:@"MobileService/form/getForm.do?params=%@",_des];
+            break;
+            /** 项目附件(材料) */
+        case DistServiceActionTypeGetMaterial:
+            return [NSString stringWithFormat:@"MobileService/processingList/getMaterial.do?params=%@",_des];
+            break;
+            /** 附件(材料)下载 */
+        case DistServiceActionTypeGetDownloadMaterial:
+            return [NSString stringWithFormat:@"MobileService/processingList/getDownload.do?params=%@",_des];
+            break;
+            /** 项目关联 */
+        case DistServiceActionTypeGetProjectRelation:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getProjectRelation.do?params=%@",_des];
+            break;
+            /** 流转日志 */
+        case DistServiceActionTypeGetProjectOperateLog:
+            return [NSString stringWithFormat:@"MobileService/form/getProjectOperateLog.do?params=%@",_des];
+            break;
+            /** 我的项目 */
+        case DistServiceActionTypeGetProjectOfMyList:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getProjectOfMyList.do?params=%@",_des];
+            break;
+            /** 表单详情(我的项目) */
+        case DistServiceActionTypeGetProcessedForm:
+            return [NSString stringWithFormat:@"MobileService/userInfo/getProcessedForm.do?params=%@",_des];
+            /** 取回列表 */
+        case DistServiceActionTypeGetRecapyionList:
+            return [NSString stringWithFormat:@"MobileService/processingList/getTokenList.do?params=%@",_des];
+            /** 取回表单 */
+        case DistServiceActionTypeGetBackForm:
+            return [NSString stringWithFormat:@"MobileService/processingList/getBack.do?params=%@",_des];
+        default:
+            break;
+    }
+}
+
+- (NSDictionary *)requestArgument {
+    
+    return _arguments;
+}
+
+
+@end

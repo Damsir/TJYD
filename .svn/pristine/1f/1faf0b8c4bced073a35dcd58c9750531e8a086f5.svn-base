@@ -1,0 +1,107 @@
+//
+//  TJYD-Header.pch
+//  TJYD
+//
+//  Created by 吴定如 on 17/3/29.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#ifndef TJYD_Header_pch
+#define TJYD_Header_pch
+
+//debug开关
+#define DistDebug 1
+
+//Log输出
+#if DistDebug
+#define DLog(fmt, ...) NSLog((@"%s [Line %d] " fmt), __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__);
+#else
+#define DLog(...)
+#endif
+
+/** 更新下载地址(蒲公英) */
+#define AppDownloadUrl_Pgyer @"https://www.pgyer.com/TJYD"
+/** 应用的APP_ID(蒲公英) */
+#define PGY_APP_ID @"a8e097ef1cd12a44f6b35c2c24616a5e"
+
+#define SCREEN_BOUNDS [[UIScreen mainScreen] bounds]
+#define SCREEN_SIZE   [[UIScreen mainScreen] bounds].size
+#define SCREEN_WIDTH  [[UIScreen mainScreen] bounds].size.width
+#define SCREEN_HEIGHT [[UIScreen mainScreen] bounds].size.height
+#define iPhone ([[UIDevice currentDevice]userInterfaceIdiom]==UIUserInterfaceIdiomPhone?[[UIDevice currentDevice]userInterfaceIdiom]==UIUserInterfaceIdiomPad,YES:NO)
+#define iOS8 ([[UIDevice currentDevice].systemVersion doubleValue] >= 8.0)
+
+#define HeaderHeight 50.0 // SlideSegment
+
+#define KeyWindow [[[UIApplication sharedApplication] delegate] window]
+
+// 用户偏好设置
+#define UserDefaults [NSUserDefaults standardUserDefaults]
+
+// 设置RGB
+#define RGBA(r, g, b, a) [UIColor colorWithRed:r/255.0f green:g/255.0f blue:b/255.0f alpha:a]
+#define RGB(r, g, b) RGBA(r, g, b, 1.0f)
+#define HOMEBLUECOLOR [UIColor colorWithRed:1.0/255.0 green:93.0/255.0 blue:173.0/255.0 alpha:1]
+#define HOMEGREENCOLOR [UIColor colorWithRed:37/255.0 green:145/255.0 blue:136/255.0 alpha:1.000]
+#define HOMECOLOR [UIColor colorWithRed:60.0/255.0 green:186.0/255.0 blue:255.0/255.0 alpha:1.0]
+#define HOMETABLECOLOR [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1]
+#define BackColor [UIColor colorWithRed:243/255.0 green:245/255.0 blue:249/255.0 alpha:1.000]
+#define SilterBackColor [UIColor colorWithRed:248/255.0 green:249/255.0 blue:251/255.0 alpha:0.6]
+#define SilterLineColor [UIColor colorWithRed:151/255.0 green:151/255.0 blue:151/255.0 alpha:0.3]
+#define GRAYCOLOR [UIColor colorWithRed:238/255.0 green:238/255.0 blue:238/255.0 alpha:1]
+#define GRAYCOLOR_CGCOLOR [UIColor colorWithRed:238/255.0 green:238/255.0 blue:238/255.0 alpha:1].CGColor
+#define GRAYCOLOR_LIGHT [UIColor colorWithRed:245/255.0 green:245/255.0 blue:245/255.0 alpha:1]
+#define BLUECOLOR [UIColor colorWithRed:34.0/255.0 green:152.0/255.0 blue:239.0/255.0 alpha:1]
+#define GRAYCOLOR_MIDDLE [UIColor colorWithRed:200/255.0 green:200/255.0 blue:200/255.0 alpha:1]
+#define GRAYCOLOR_DARK [UIColor colorWithRed:100/255.0 green:100/255.0 blue:100/255.0 alpha:1]
+// 系统按钮蓝色(#007aff)
+#define BLUECOLOR_SYSTEM [UIColor colorWithRed:0/255.0 green:122/255.0 blue:255/255.0 alpha:1.0]
+
+// 字体
+#define Font_PingFangSC_Light @"PingFangSC-Light"
+#define Font_PingFangSC_Regular @"PingFangSC-Regular"
+#define Font_PingFangSC_Medium @"PingFangSC-Medium"
+/*
+ PingFangSC-Thin
+ PingFangSC-Light
+ PingFangSC-Regular
+ PingFangSC-Medium
+ PingFangSC-Semibold
+ */
+
+// 弱引用
+#define DefineWeakSelf(weakSelf) __weak __typeof(self) weakSelf = self
+
+// 按钮点击时间间隔
+#define EventTimeInterval 0.5
+
+// 头文件
+#ifdef __OBJC__
+#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
+#import "UIViewController+Animation.h"
+#import "UIViewController+NavigationTitle.h"
+#import "UIView+Message.h"
+#import "SHBaseViewController.h"
+#import "MBProgressHUD+MJ.h"
+#import "Global.h"
+#import "AFNetworking.h"
+#import "DamNetworkingManager.h"
+#import "MJRefresh.h"
+#import "MJExtension.h"
+#import "DES.h"
+#import "TFHpple.h"
+#import "SingleLogin.h"
+#import "DistServiceAPI.h"
+#import "DistNetInterface.h"
+#endif
+
+/** 加密密钥 */
+static NSString *Key = @"0987987657453627";
+
+static NSDateFormatter *dateFormattor;
+
+#pragma mark -- 视图里面按钮回调事件
+typedef void(^selectedBlock)(NSInteger index);
+
+#endif /* TJYD_Header_pch */

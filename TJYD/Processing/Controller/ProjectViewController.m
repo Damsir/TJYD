@@ -1,0 +1,382 @@
+//
+//  ProjectViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 2017/3/13.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "ProjectViewController.h"
+#import "ProjectCell.h"
+#import "ProjectModel.h"
+#import "ProjectDetailVC.h"//项目详情
+
+static NSString *cellId = @"ProjectCell";
+
+@interface ProjectViewController () <UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate>
+
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,strong) NSMutableArray *searchArray;
+@property (nonatomic,assign) NSInteger pageSize;
+@property (nonatomic,assign) NSInteger pageIndex;
+@property (nonatomic,strong) UISearchBar *searchBar;
+@property (nonatomic,assign) BOOL isSearch;//标记搜索状态
+@property (nonatomic,assign) NSInteger selectIndex;//选择的项目位置
+@property (nonatomic,strong) ProjectDetailVC *detailVC;
+
+@end
+
+@implementation ProjectViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    //    [self.tableView.header setAutoChangeAlpha:YES];
+    //    [self.tableView.header beginRefreshing];
+}
+
+- (void)reloadData {
+    _pageIndex = 1;
+    _pageSize = 10;
+    _dataArray = [NSMutableArray array];
+    _searchArray = [NSMutableArray array];
+    // 刷新一次
+    [self.tableView.header setAutoChangeAlpha:YES];
+    [self.tableView.header beginRefreshing];
+}
+
+- (void)dealloc {
+    // 移除通知和监听
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    //[[self.view removeObserver:self forKeyPath:@"frame" context:nil];
+    
+    //    [_detailVC removeFromParentViewController];
+    //    _detailVC = nil;
+}
+
+#pragma mark -- 取回表单成功
+- (void)goBackFormSuccess:(NSNotification *)noty {
+    
+    [self.tableView.header beginRefreshing];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    self.automaticallyAdjustsScrollViewInsets = NO;
+    
+    [self creatTableView];
+    //    [self loadData];
+    
+    
+    // 取回表单成功监听
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(goBackFormSuccess:) name:@"goBackFormSuccess" object:nil];
+    // 保存发送人员成功的通知
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(removeSelectIndexCell:) name:@"onCompleted" object:nil];
+    // 表单回退成功的通知
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(removeSelectIndexCell:) name:@"formBackSuccess" object:nil];
+    // 监听屏幕旋转
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(screenRotation:) name:UIApplicationWillChangeStatusBarOrientationNotification object:nil];
+    
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotation:(NSNotification *)noty {
+    
+    self.tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-49-50);
+}
+
+- (void)loadData {
+    
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 待办事项(项目)
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==ApprpveMobile/getProcessingList.do?queryFilter=&pageIndex=%ld&pageSize=%ld,%@",_pageIndex,_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProcessingList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            ProjectModel *model = [[ProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (ListModel *listModel in model.list) {
+                [_dataArray addObject:listModel];
+            }
+            DLog(@"model:%@",_dataArray);
+            [self.tableView reloadData];
+            // 加载更多
+            BOOL loadMore = [JsonDic[@"result"][@"count"] integerValue] > _pageIndex * _pageSize;
+            [self setLoadMoreData:loadMore];
+            
+            /**
+             *  模型 -> 字典
+             */
+            //            NSDictionary *proDic =  [model mj_keyValues];
+            //            NSLog(@"proDic:%@",proDic);
+            // 暂无数据
+            _dataArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                
+            }];
+        }
+        
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- 设置上拉加载更多
+- (void)setLoadMoreData:(BOOL)loadMore {
+    
+    if (loadMore) {
+        // 上拉加载更多
+        [self.tableView.footer resetNoMoreData];
+    } else {
+        // 没有更多数据
+        //self.tableView.footer = nil;
+        [self.tableView.footer noticeNoMoreData];
+    }
+}
+
+#pragma mark -- 创建表格和搜索框
+- (void)creatTableView {
+    
+    UISearchBar *searchBar = [[UISearchBar alloc]initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 44)];
+    //设置输入颜色
+    searchBar.tintColor = HOMEBLUECOLOR;
+    //UIImage *image =[self imageWithColor:[UIColor whiteColor]];
+    //设置搜索框的背景图片
+    //[searchBar setSearchFieldBackgroundImage:image forState:UIControlStateNormal];
+    //设置背景颜色
+    [searchBar setBarTintColor:[UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1]];
+    searchBar.placeholder = @"搜索";
+    //searchBar.layer.borderColor = [UIColor colorWithRed:201/255.0 green:201/255.0  blue:206/255.0  alpha:1.0].CGColor;
+    searchBar.layer.borderColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1].CGColor;
+    searchBar.layer.borderWidth = 0.5;
+    searchBar.delegate = self;
+    searchBar.clearsContextBeforeDrawing = YES;
+    //searchBar.showsCancelButton = NO;
+    searchBar.searchBarStyle = UISearchBarStyleDefault;
+    searchBar.returnKeyType = UIReturnKeySearch;
+    //[searchBar sizeToFit];
+    _searchBar = searchBar;
+    
+    self.tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64-49-50);
+    self.tableView.delegate =self;
+    self.tableView.dataSource = self;
+    self.tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    [self.tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    
+    [self.view addSubview:self.tableView];
+    
+    self.tableView.tableHeaderView = searchBar;
+    
+    // 下拉刷新
+    self.tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        if (_isSearch) {
+            // 搜索
+            [_searchArray removeAllObjects];
+            _pageIndex = 1;
+            [self loadSearchData];
+        } else {
+            // 正常
+            [_dataArray removeAllObjects];
+            _pageIndex = 1;
+            [self loadData];
+        }
+    }];
+    // 上拉加载更多
+    self.tableView.footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        _pageIndex ++;
+        if (_isSearch) {
+            // 搜索
+            [self loadSearchData];
+        } else {
+            // 正常
+            [self loadData];
+        }
+    }];
+}
+
+#pragma mark -- UITableViewDataSource,UITableViewDelegate
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    
+    return _isSearch ? _searchArray.count : _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    //    static NSString *CellTableIdentifer = @"ProjectCell";
+    //    //tableView注册nib文件
+    //    static BOOL nibsRegistered = NO;
+    //    if(!nibsRegistered)
+    //    {
+    //        UINib *nib = [UINib nibWithNibName:@"ProjectCell" bundle:nil];
+    //        [self.tableView registerNib:nib forCellReuseIdentifier:CellTableIdentifer];
+    //        nibsRegistered = YES;
+    //    }
+    
+    ProjectCell *projectCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    
+    
+    if (_isSearch) {
+        if (_searchArray.count > indexPath.row) {
+            
+            ListModel *model = _searchArray[indexPath.row];
+            projectCell.title.text = model.INFO;
+            projectCell.businessName.text = [NSString stringWithFormat:@"%@ · %@",model.STAGE,model.ACTIVITY_NAME];
+            projectCell.date.text = model.RECEIVEDDATE;
+            projectCell.isBack.hidden = ([model.backto isEqualToString:@""] || model.backto == nil) ? YES : NO;
+        }
+    } else {
+        if (_dataArray.count > indexPath.row) {
+            
+            ListModel *model = _dataArray[indexPath.row];
+            projectCell.title.text = model.INFO;
+            projectCell.businessName.text = [NSString stringWithFormat:@"%@ · %@",model.STAGE,model.ACTIVITY_NAME];
+            projectCell.date.text = model.RECEIVEDDATE;
+            projectCell.isBack.hidden = ([model.backto isEqualToString:@""] || model.backto == nil) ? YES : NO;
+        }
+    }
+    
+    return projectCell;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return 70.0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    [self.view endEditing:YES];
+    
+    if (!_detailVC) {
+        _detailVC = [[ProjectDetailVC alloc] init];
+    }
+    _detailVC.hidesBottomBarWhenPushed = YES;
+    _detailVC.navi = self.navi;
+    if (_isSearch) {
+        _detailVC.listModel = _searchArray[indexPath.row];
+    } else {
+        _detailVC.listModel = _dataArray[indexPath.row];
+    }
+    // 选择的项目位置
+    self.selectIndex = indexPath.row;
+    
+    [_detailVC reloadData];
+    
+    [self pushToViewControllerWithTransition:_detailVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navi];
+}
+
+#pragma mark -- 开始编辑
+- (void)searchBarTextDidBeginEditing:(UISearchBar *)searchBar {
+    
+    _searchBar.showsCancelButton = YES;
+}
+
+- (void)searchBarCancelButtonClicked:(UISearchBar *)searchBar {
+    
+    _searchBar.showsCancelButton = NO;
+    [_searchBar resignFirstResponder];
+    _searchBar.text = @"";
+    
+    // 判断是否有数据
+    _dataArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+    // 上拉加载更多(重置)
+    [self.tableView.footer resetNoMoreData];
+    // 当前处于未编辑状态
+    _isSearch = NO;
+    [self.tableView reloadData];
+}
+
+#pragma mark -- 点击键盘上的search按钮时调用
+- (void)searchBarSearchButtonClicked:(UISearchBar *)searchBar {
+    [self.view endEditing:YES];
+    _isSearch = YES;
+    
+    [_searchArray removeAllObjects];
+    [self loadSearchData];
+}
+
+- (void)loadSearchData {
+    
+    [MBProgressHUD showMessage:@"正在搜索" toView:self.view];
+    // 待办事项(项目)
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==ApprpveMobile/getProcessingList.do?queryFilter=%@&pageIndex=%ld&pageSize=%ld,%@",_searchBar.text,_pageIndex,_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProcessingList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            ProjectModel *model = [[ProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (ListModel *listModel in model.list) {
+                [_searchArray addObject:listModel];
+            }
+            DLog(@"model:%@",_searchArray);
+            [self.tableView reloadData];
+            // 加载更多
+            BOOL loadMore = [JsonDic[@"result"][@"count"] integerValue] > _pageIndex * _pageSize;
+            [self setLoadMoreData:loadMore];
+            
+            // 暂无数据
+            _searchArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                
+            }];
+        }
+        
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [self.tableView.header endRefreshing];
+        //[self.tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- 收到保存发送人员成功的通知 --
+#pragma mark -- 发送成功移除相应的项目(视图)
+- (void)removeSelectIndexCell:(NSNotification *)noty {
+    
+    if (_isSearch) {
+        [_searchArray removeObjectAtIndex:self.selectIndex];
+    } else {
+        [_dataArray removeObjectAtIndex:self.selectIndex];
+    }
+    
+    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.selectIndex inSection:0];
+    [self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
+    
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+
+@end

@@ -1,0 +1,179 @@
+//
+//  MyProjectDetailVC.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/4/17.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "MyProjectDetailVC.h"
+#import "SHCover.h"
+#import "DamSlideSegment.h"
+#import "MyProjectInfoVC.h"
+#import "MyProjectMaterialVC.h"
+#import "LogViewController.h"
+#import "TreeViewController.h"
+
+@interface MyProjectDetailVC () <SHCoverDelegate>
+
+@property (nonatomic,strong) MyProjectInfoVC *infoVC;
+@property (nonatomic,strong) MyProjectMaterialVC *materialVC;
+@property (nonatomic,strong) DamSlideSegment *slideSegment;
+@property (nonatomic,strong) UIView *popView;//选择视图
+@property (nonatomic,strong) UIView *cover;//蒙版
+@property (nonatomic,strong) NSArray *btnImageArray;//按钮图片数组
+@property (nonatomic,strong) NSArray *btnTitleArray;//按钮标题数组
+
+@end
+
+@implementation MyProjectDetailVC
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [_infoVC viewWillAppear:animated];
+    [_materialVC viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    self.automaticallyAdjustsScrollViewInsets = NO;
+    
+    [self initNavigationBarTitle:@"项目详情"];
+    [self createSlideSegment];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"more"] style:UIBarButtonItemStyleDone target:self action:@selector(moreOnClick)];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _slideSegment.frame= CGRectMake(0, 0, SCREEN_WIDTH,  SCREEN_HEIGHT - 64);
+    [_slideSegment screenRotationWithFrame:_slideSegment.frame];
+    _popView.frame = CGRectMake(SCREEN_WIDTH-135, 64, 120, 80);
+    _cover.frame = [UIScreen mainScreen].bounds;
+}
+
+#pragma mark -- 创建slideSegment
+
+- (void)createSlideSegment {
+    // 项目信息
+    MyProjectInfoVC *infoVC = [[MyProjectInfoVC alloc] init];
+    infoVC.listModel = _listModel;
+    _infoVC = infoVC;
+    
+    // 项目附件
+    MyProjectMaterialVC *materialVC = [[MyProjectMaterialVC alloc] init];
+    materialVC.listModel = _listModel;
+    materialVC.navi = self.navi;
+    _materialVC = materialVC;
+    
+    NSArray *viewsArray = @[infoVC.view,materialVC.view];
+    NSArray *titlesArray = @[@"项目信息",@"项目附件"];
+    
+    DamSlideSegment *slideSegment = [[DamSlideSegment alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,  SCREEN_HEIGHT - 64) WithControllerViewArray:viewsArray AndWithTitlesArray:titlesArray];
+    slideSegment.backgroundColor = [UIColor whiteColor];
+    _slideSegment = slideSegment;
+    [self.view addSubview:_slideSegment];
+    
+}
+
+#pragma mark -- 更多(流转日志,项目关联)
+- (void)moreOnClick {
+    
+    _btnImageArray = @[@"spot",@"spot"];
+    _btnTitleArray = @[@"流转日志",@"项目关联"];
+    //弹出选择框
+    SHCover *cover = [SHCover show];
+    _cover = cover;
+    cover.userInteractionEnabled = YES;
+    cover.delegate = self;
+    UIView *popView = [[UIView alloc] initWithFrame:CGRectMake(SCREEN_WIDTH - 135, 64, 120, 80)];
+    popView.backgroundColor = [UIColor whiteColor];
+    _popView = popView;
+    [KeyWindow addSubview:_popView];
+    
+    [self creatMoreBtn];
+}
+
+- (void)creatMoreBtn {
+    
+    long count = [self.btnTitleArray count];
+    for ( int i = 0; i<count; i++) {
+        UIButton *btn =[UIButton buttonWithType:UIButtonTypeCustom];
+        [btn setImage:[UIImage imageNamed:_btnImageArray[i]] forState:UIControlStateNormal];
+        [btn setTitle:_btnTitleArray[i] forState:UIControlStateNormal];
+        [btn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+        [btn.titleLabel setFont:[UIFont systemFontOfSize:15.0]];
+        [btn setImageEdgeInsets:UIEdgeInsetsMake(0, 10, 0, 90)];
+        btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+        btn.titleEdgeInsets = UIEdgeInsetsMake(0, 20, 0, 0);
+        
+        btn.frame = CGRectMake(0, _popView.frame.size.height*i/2.0, _popView.frame.size.width, _popView.frame.size.height/2.0);
+        btn.tag = 150+i;
+        UIView *line =[[UIView alloc] initWithFrame:CGRectMake(0, _popView.frame.size.height/2.0, _popView.frame.size.width, 0.5)];
+        line.backgroundColor = GRAYCOLOR_MIDDLE;
+        [btn addTarget:self action:@selector(btnClick:) forControlEvents:UIControlEventTouchUpInside];
+        [_popView addSubview:btn];
+        [btn addSubview:line];
+    }
+}
+
+- (void)btnClick:(UIButton *)btn {
+    
+    NSInteger btntag = btn.tag-150;
+    [_popView removeFromSuperview];
+    [_cover removeFromSuperview];
+    switch (btntag) {
+        case 0:
+        {
+            LogViewController *logVC = [[LogViewController alloc] init];
+            logVC.myListModel = _listModel;
+            [self pushToViewControllerWithTransition:logVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navi];
+        }
+            break;
+        case 1:
+        {
+            TreeViewController *treeVC = [[TreeViewController alloc] init];
+            treeVC.myListModel = _listModel;
+            [self pushToViewControllerWithTransition:treeVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navi];
+        }
+            break;
+        default:
+            break;
+    }
+}
+
+#pragma mark -- 点击蒙板的时候调用(SHCoverDelegate)
+- (void)coverDidClickCover:(SHCover *)cover {
+    // 隐藏pop菜单
+    [_popView removeFromSuperview];
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navi];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

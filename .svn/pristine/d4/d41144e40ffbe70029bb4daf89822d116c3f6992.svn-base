@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="10117" systemVersion="15G1217" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="10085"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <tableViewCell contentMode="scaleToFill" selectionStyle="default" indentationWidth="10" id="KGk-i7-Jjw" customClass="LogCell">
+            <rect key="frame" x="0.0" y="0.0" width="375" height="44"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="KGk-i7-Jjw" id="H2p-sc-9uM">
+                <rect key="frame" x="0.0" y="0.0" width="375" height="43.5"/>
+                <autoresizingMask key="autoresizingMask"/>
+                <subviews>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="log" textAlignment="natural" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="iFK-3b-MfP">
+                        <rect key="frame" x="138" y="16" width="222" height="24"/>
+                        <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                        <color key="textColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <nil key="highlightedColor"/>
+                    </label>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="2017-00-00" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="0zx-bl-Ubj">
+                        <rect key="frame" x="40" y="16" width="95" height="24"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="24" id="afV-GB-edZ"/>
+                            <constraint firstAttribute="width" constant="95" id="w3e-nN-i8w"/>
+                        </constraints>
+                        <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
+                        <color key="textColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <nil key="highlightedColor"/>
+                    </label>
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="U2x-Pd-pQl" userLabel="line_h">
+                        <rect key="frame" x="25" y="0.0" width="2" height="18"/>
+                        <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstAttribute="width" constant="2" id="cKW-Xt-I7n"/>
+                            <constraint firstAttribute="height" constant="18" id="gsz-AI-TrE"/>
+                        </constraints>
+                    </view>
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="hMD-vD-wnm" userLabel="spot">
+                        <rect key="frame" x="21" y="23" width="10" height="10"/>
+                        <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstAttribute="height" constant="10" id="b54-LD-W0y"/>
+                            <constraint firstAttribute="width" constant="10" id="faz-ps-pOW"/>
+                        </constraints>
+                    </view>
+                </subviews>
+                <constraints>
+                    <constraint firstItem="iFK-3b-MfP" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="16" id="DEe-dd-qei"/>
+                    <constraint firstItem="0zx-bl-Ubj" firstAttribute="leading" secondItem="hMD-vD-wnm" secondAttribute="trailing" constant="9" id="Fcu-JZ-XMp"/>
+                    <constraint firstAttribute="bottom" secondItem="iFK-3b-MfP" secondAttribute="bottom" constant="3.5" id="Koj-lH-ipC"/>
+                    <constraint firstItem="U2x-Pd-pQl" firstAttribute="leading" secondItem="H2p-sc-9uM" secondAttribute="leading" constant="25" id="TdQ-Kn-2EM"/>
+                    <constraint firstItem="hMD-vD-wnm" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="23" id="VYS-cL-4Pc"/>
+                    <constraint firstItem="0zx-bl-Ubj" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="16" id="WFW-o8-01P"/>
+                    <constraint firstItem="hMD-vD-wnm" firstAttribute="leading" secondItem="H2p-sc-9uM" secondAttribute="leading" constant="21" id="Xoz-fx-En0"/>
+                    <constraint firstItem="U2x-Pd-pQl" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" id="ZrG-6M-CHl"/>
+                    <constraint firstItem="iFK-3b-MfP" firstAttribute="leading" secondItem="0zx-bl-Ubj" secondAttribute="trailing" constant="3" id="jGd-Qb-GTY"/>
+                    <constraint firstAttribute="trailing" secondItem="iFK-3b-MfP" secondAttribute="trailing" constant="15" id="ldT-X9-4bd"/>
+                </constraints>
+            </tableViewCellContentView>
+            <connections>
+                <outlet property="date" destination="0zx-bl-Ubj" id="U3Z-5t-1vG"/>
+                <outlet property="log" destination="iFK-3b-MfP" id="FL7-pU-CUf"/>
+                <outlet property="spot" destination="hMD-vD-wnm" id="9n8-gW-39n"/>
+            </connections>
+            <point key="canvasLocation" x="125.5" y="217"/>
+        </tableViewCell>
+    </objects>
+</document>

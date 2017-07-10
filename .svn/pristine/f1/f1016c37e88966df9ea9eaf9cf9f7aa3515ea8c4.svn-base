@@ -1,0 +1,169 @@
+//
+//  ProjectViewController.m
+//  TJYD
+//
+//  Created by 叶松丹 on 2017/3/13.
+//  Copyright © 2017年 叶松丹. All rights reserved.
+//
+
+#import "ProjectViewController.h"
+#import "ProjectCell.h"
+#import "ProjectModel.h"
+#import "ProjectDetailVC.h"//项目详情
+
+static NSString *cellId = @"ProjectCell";
+
+@interface ProjectViewController () <UITableViewDelegate,UITableViewDataSource>
+
+@property (nonatomic,strong) UITableView *tableView;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,assign) NSInteger pageSize;
+
+@end
+
+@implementation ProjectViewController
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor purpleColor];
+    
+    _dataArray = [NSMutableArray array];
+    _pageSize = 10;
+    
+    [self creatTableView];
+    [self loadData];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-49-50);
+}
+
+- (void)loadData
+{
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 待办事项(项目)
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[NSString stringWithFormat:@"action==ApprpveMobile/getProcessingList.do?queryFilter=&pageIndex=1&pageSize=%ld,%@",_pageSize,ticket] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProcessingList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            ProjectModel *model = [[ProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (ListModel *listModel in model.list) {
+                [_dataArray addObject:listModel];
+            }
+            DLog(@"model:%@",_dataArray);
+            [_tableView reloadData];
+        } else {
+            // 单点登录超时(sessionTimeOut)
+//            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+//                
+//            }];
+        }
+        
+        [_tableView.header endRefreshing];
+        [_tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [_tableView.header endRefreshing];
+        [_tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+- (void)creatTableView
+{
+    UITableView *tableView =[[UITableView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64-49-50) style:UITableViewStylePlain];
+    tableView.delegate =self;
+    tableView.dataSource = self;
+    tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    [tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    _tableView = tableView;
+
+    [self.view addSubview:tableView];
+    
+    // 下拉刷新
+    _tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        //_pageSize = 20;
+        [self loadData];
+    }];
+    // 上拉加载更多
+    _tableView.footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        _pageSize += 10;
+        [self loadData];
+    }];
+    
+}
+
+#pragma -mark  UITableViewDataSource,UITableViewDelegate
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    ProjectCell *projectCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    if (_dataArray.count > indexPath.row) {
+        
+        ListModel *model = _dataArray[indexPath.row];
+        projectCell.title.text = model.INFO;
+        projectCell.businessName.text = [NSString stringWithFormat:@"%@ · %@",model.BUSINESSNAME,model.ACTIVITY_NAME];
+        projectCell.date.text = [NSString stringWithFormat:@"%@", model.RECEIVEDDATE];
+    }
+    
+    return projectCell;
+}
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    return 70.0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    ProjectDetailVC *detailVC = [[ProjectDetailVC alloc] init];
+    detailVC.hidesBottomBarWhenPushed = YES;
+    detailVC.model = _dataArray[indexPath.row];
+    
+    [self pushToViewControllerWithTransition:detailVC withDirection:@"right" type:NO superNavi:self.navi];
+}
+
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+@end

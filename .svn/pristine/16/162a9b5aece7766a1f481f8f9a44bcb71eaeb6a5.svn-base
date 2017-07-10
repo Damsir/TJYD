@@ -1,0 +1,340 @@
+//
+//  ProjectViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 2017/3/13.
+//  Copyright © 2017年 Dist. All rights reserved.
+//
+
+#import "ProjectViewController.h"
+#import "ProjectCell.h"
+#import "ProjectModel.h"
+#import "ProjectDetailVC.h"//项目详情
+
+static NSString *cellId = @"ProjectCell";
+
+@interface ProjectViewController () <UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate>
+
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,strong) NSMutableArray *searchArray;
+@property (nonatomic,assign) NSInteger pageSize;
+@property (nonatomic,strong) UISearchBar *searchBar;
+@property (nonatomic,assign) BOOL isSearch;//标记搜索状态
+@property (nonatomic,assign) NSInteger selectIndex;//选择的项目位置
+
+@end
+
+@implementation ProjectViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+//    [self.tableView.header setAutoChangeAlpha:YES];
+//    [self.tableView.header beginRefreshing];
+}
+
+- (void)dealloc {
+    // 移除通知和监听
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    //[[self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+#pragma mark -- 取回表单成功
+- (void)goBackFormSuccess:(NSNotification *)noty {
+
+    [self.tableView.header beginRefreshing];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    
+    _pageSize = 10;
+    
+    [self creatTableView];
+//    [self loadData];
+    
+    
+    // 取回表单成功监听
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(goBackFormSuccess:) name:@"goBackFormSuccess" object:nil];
+    // 保存发送人员成功的通知
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(removeSelectIndexCell:) name:@"saveSendUsersSuccess" object:nil];
+    // 表单回退成功的通知
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(removeSelectIndexCell:) name:@"formBackSuccess" object:nil];
+    // 监听屏幕旋转
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(screenRotation:) name:UIApplicationWillChangeStatusBarOrientationNotification object:nil];
+    
+}
+
+#pragma mark -- 屏幕旋转
+- (void)screenRotation:(NSNotification *)noty {
+    
+    self.tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64-49-50);
+}
+
+- (void)loadData {
+    
+    _dataArray = [NSMutableArray array];
+    
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 待办事项(项目)
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==ApprpveMobile/getProcessingList.do?queryFilter=&pageIndex=1&pageSize=%ld,%@",_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProcessingList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            ProjectModel *model = [[ProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (ListModel *listModel in model.list) {
+                [_dataArray addObject:listModel];
+            }
+            DLog(@"model:%@",_dataArray);
+            [self.tableView reloadData];
+            /**
+             *  模型 -> 字典
+             */
+//            NSDictionary *proDic =  [model mj_keyValues];
+//            NSLog(@"proDic:%@",proDic);
+            // 暂无数据
+            _dataArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                
+            }];
+        }
+        
+        [self.tableView.header endRefreshing];
+        [self.tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [self.tableView.header endRefreshing];
+        [self.tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- 创建表格和搜索框
+- (void)creatTableView {
+    
+    UISearchBar *searchBar = [[UISearchBar alloc]initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 44)];
+    //设置输入颜色
+    searchBar.tintColor = HOMEBLUECOLOR;
+    //UIImage *image =[self imageWithColor:[UIColor whiteColor]];
+    //设置搜索框的背景图片
+    //[searchBar setSearchFieldBackgroundImage:image forState:UIControlStateNormal];
+    //设置背景颜色
+    [searchBar setBarTintColor:[UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1]];
+    searchBar.placeholder = @"搜索";
+    searchBar.layer.borderColor = [UIColor colorWithRed:201/255.0 green:201/255.0  blue:206/255.0  alpha:1.0].CGColor;
+    searchBar.layer.borderColor = [UIColor colorWithRed:235/255.0 green:240/255.0 blue:245/255.0 alpha:1].CGColor;
+    searchBar.layer.borderWidth = 0.5;
+    searchBar.delegate = self;
+    searchBar.clearsContextBeforeDrawing = YES;
+    //searchBar.showsCancelButton = NO;
+    searchBar.searchBarStyle = UISearchBarStyleDefault;
+    searchBar.returnKeyType = UIReturnKeySearch;
+    //[searchBar sizeToFit];
+    _searchBar = searchBar;
+    
+    UITableView *tableView =[[UITableView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64-49-50) style:UITableViewStylePlain];
+    tableView.delegate = self;
+    tableView.dataSource = self;
+    tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    [tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    self.tableView = tableView;
+
+    [self.view addSubview:tableView];
+    
+    tableView.tableHeaderView = searchBar;
+    
+    // 下拉刷新
+    self.tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        if (_isSearch) {
+            // 搜索
+            [_searchArray removeAllObjects];
+            [self loadSearchData];
+        } else {
+            // 正常
+            [_dataArray removeAllObjects];
+            [self loadData];
+        }
+        //_pageSize = 20;
+    }];
+    // 上拉加载更多
+    self.tableView.footer = [MJRefreshBackNormalFooter footerWithRefreshingBlock:^{
+        
+        if (_isSearch) {
+            // 搜索
+            [_searchArray removeAllObjects];
+            _pageSize += 10;
+            [self loadSearchData];
+        } else {
+            // 正常
+            [_dataArray removeAllObjects];
+            _pageSize += 10;
+            [self loadData];
+        }
+    }];
+    
+    // 刷新一次
+    [self.tableView.header setAutoChangeAlpha:YES];
+    [self.tableView.header beginRefreshing];
+    
+}
+
+#pragma mark -- UITableViewDataSource,UITableViewDelegate
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    
+    return _isSearch ? _searchArray.count : _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    ProjectCell *projectCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    
+    if (_isSearch) {
+        if (_searchArray.count > indexPath.row) {
+            
+            ListModel *model = _searchArray[indexPath.row];
+            projectCell.title.text = model.INFO;
+            projectCell.businessName.text = [NSString stringWithFormat:@"%@ · %@",model.BUSINESSNAME,model.ACTIVITY_NAME];
+            projectCell.date.text = model.RECEIVEDDATE;
+        }
+    } else {
+        if (_dataArray.count > indexPath.row) {
+            
+            ListModel *model = _dataArray[indexPath.row];
+            projectCell.title.text = model.INFO;
+            projectCell.businessName.text = [NSString stringWithFormat:@"%@ · %@",model.BUSINESSNAME,model.ACTIVITY_NAME];
+            projectCell.date.text = model.RECEIVEDDATE;
+        }
+    }
+
+    return projectCell;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return 70.0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    [self.view endEditing:YES];
+    
+    ProjectDetailVC *detailVC = [[ProjectDetailVC alloc] init];
+    detailVC.hidesBottomBarWhenPushed = YES;
+    detailVC.navi = self.navi;
+    if (_isSearch) {
+        detailVC.listModel = _searchArray[indexPath.row];
+    } else {
+        detailVC.listModel = _dataArray[indexPath.row];
+    }
+    
+    // 选择的项目位置
+    self.selectIndex = indexPath.row;
+    
+    [self pushToViewControllerWithTransition:detailVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navi];
+}
+
+#pragma mark -- 开始编辑
+- (void)searchBarTextDidBeginEditing:(UISearchBar *)searchBar {
+    
+    _searchBar.showsCancelButton = YES;
+}
+
+- (void)searchBarCancelButtonClicked:(UISearchBar *)searchBar {
+    
+    _searchBar.showsCancelButton = NO;
+    [_searchBar resignFirstResponder];
+    _searchBar.text = @"";
+
+    // 当前处于未编辑状态
+    _isSearch = NO;
+    [self.tableView reloadData];
+}
+
+#pragma mark -- 点击键盘上的search按钮时调用
+- (void)searchBarSearchButtonClicked:(UISearchBar *)searchBar {
+    [self.view endEditing:YES];
+    _isSearch = YES;
+    
+    [self loadSearchData];
+}
+
+- (void)loadSearchData {
+    
+    _searchArray = [NSMutableArray array];
+    
+    [MBProgressHUD showMessage:@"正在搜索" toView:self.view];
+    // 待办事项(项目)
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==ApprpveMobile/getProcessingList.do?queryFilter=%@&pageIndex=1&pageSize=%ld,%@",_searchBar.text,_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetProcessingList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            ProjectModel *model = [[ProjectModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (ListModel *listModel in model.list) {
+                [_searchArray addObject:listModel];
+            }
+            DLog(@"model:%@",_searchArray);
+            [self.tableView reloadData];
+            
+            // 暂无数据
+            _searchArray.count == 0 ? [self showEmptyData]: [self removeEmptyData] ;
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+                
+            }];
+        }
+        
+        [self.tableView.header endRefreshing];
+        [self.tableView.footer endRefreshing];
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [self.tableView.header endRefreshing];
+        [self.tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+#pragma mark -- 收到保存发送人员成功的通知 --
+#pragma mark -- 发送成功移除相应的项目(视图)
+- (void)removeSelectIndexCell:(NSNotification *)noty {
+    
+    if (_isSearch) {
+        [_searchArray removeObjectAtIndex:self.selectIndex];
+    } else {
+        [_dataArray removeObjectAtIndex:self.selectIndex];
+    }
+    
+    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.selectIndex inSection:0];
+    [self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationLeft];
+    
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+@end

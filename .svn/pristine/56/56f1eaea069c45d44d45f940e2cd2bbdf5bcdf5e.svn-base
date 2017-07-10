@@ -1,0 +1,179 @@
+//
+//  NewsViewController.m
+//  TJYD
+//
+//  Created by 吴定如 on 17/3/16.
+//  Copyright © 2017年 叶松丹. All rights reserved.
+//
+
+#import "NewsViewController.h"
+#import "NewsCell.h"
+#import "NewsModel.h"
+
+static NSString *cellId = @"NewsCell";
+
+@interface NewsViewController () <UITableViewDelegate,UITableViewDataSource>
+
+@property (nonatomic,strong) UITableView *tableView;
+@property (nonatomic,strong) NSMutableArray *dataArray;
+@property (nonatomic,assign) NSInteger pageSize;
+
+@end
+
+@implementation NewsViewController
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    
+    // KVO(监听屏幕旋转)
+    [self.view addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.view removeObserver:self forKeyPath:@"frame" context:nil];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    
+    [_tableView.header beginRefreshing];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self initNavigationBarTitle:@"院内新闻"];
+    
+    _dataArray = [NSMutableArray array];
+    _pageSize = 10;
+    
+    [self creatTableView];
+    [self loadData];
+    
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"back"] style:UIBarButtonItemStyleDone target:self action:@selector(backToLastViewController)];
+    
+}
+
+#pragma mark -- 监听屏幕旋转
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if (![@"frame" isEqualToString:keyPath]) return;
+    
+    _tableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT-64);
+}
+
+- (void)loadData
+{
+    [MBProgressHUD showMessage:@"正在加载" toView:self.view];
+    // 院内新闻
+    NSString *ticket = [UserDefaults objectForKey:@"ticket"];
+    NSString *des = [DES encryptUseDES:[[NSString stringWithFormat:@"action==noticeInfo/getAllNoticeList.do?noticeStyle=YNXW&pageIndex=1&pageSize=%ld&queryFilter=,%@",_pageSize,ticket] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] key:Key];
+    DistServiceAPI *api = [[DistServiceAPI alloc] initWithDes:des DistServiceActionType:DistServiceActionTypeGetAllNoticeList requestMethod:DistRequestMethodPost arguments:nil];
+    [api startWithCompletionBlockWithSuccess:^(__kindof DistBaseRequest *request) {
+        
+        NSDictionary *JsonDic = request.responseJSONObject;
+        
+        if ([[JsonDic objectForKey:@"state"] isEqualToString:@"true"]) {
+            NewsModel *model = [[NewsModel alloc] initWithDictionary:[JsonDic objectForKey:@"result"]];
+            for (NewsListModel *listModel in model.list) {
+                [_dataArray addObject:listModel];
+            }
+            NSLog(@"model:%@",_dataArray);
+            [_tableView reloadData];
+            
+            [_tableView.header endRefreshing];
+            [_tableView.footer endRefreshing];
+            
+        } else {
+            // 单点登录超时(sessionTimeOut)
+            [SingleLogin singleLoginActionWithSuccess:^(BOOL success) {
+            }];
+        }
+        //加载提示框
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    } failure:^(__kindof DistBaseRequest *request, NSError *error) {
+        [_tableView.header endRefreshing];
+        [_tableView.footer endRefreshing];
+        [MBProgressHUD hideHUDForView:self.view animated:NO];
+    }];
+}
+
+- (void)creatTableView
+{
+    UITableView *tableView =[[UITableView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH,SCREEN_HEIGHT-64) style:UITableViewStylePlain];
+    tableView.delegate =self;
+    tableView.dataSource = self;
+    tableView.separatorStyle =UITableViewCellSeparatorStyleNone;
+    [tableView registerNib:[UINib nibWithNibName:cellId bundle:nil] forCellReuseIdentifier:cellId];
+    _tableView = tableView;
+    
+    [self.view addSubview:tableView];
+    
+    // 下拉刷新
+    _tableView.header = [MJRefreshNormalHeader headerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        //_pageSize = 20;
+        [self loadData];
+    }];
+    // 上拉加载更多
+    _tableView.footer = [MJRefreshBackNormalFooter footerWithRefreshingBlock:^{
+        
+        [_dataArray removeAllObjects];
+        _pageSize += 10;
+        [self loadData];
+    }];
+}
+
+#pragma -mark  UITableViewDataSource,UITableViewDelegate
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    
+    return _dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    NewsCell *newsCell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    
+    if (_dataArray.count > indexPath.row) {
+        
+        NewsListModel *model = _dataArray[indexPath.row];
+        newsCell.title.text = model.GSBT;
+        newsCell.readCount.text = model.PERSON;
+        newsCell.date.text = model.FBSJ;
+    }
+    return newsCell;
+}
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    return 60.0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+//    MyProjectDetailVC *detailVC = [[MyProjectDetailVC alloc] init];
+//    detailVC.hidesBottomBarWhenPushed = YES;
+//    detailVC.navi = self.navigationController;
+//    detailVC.listModel = _dataArray[indexPath.row];
+//    
+//    [self pushToViewControllerWithTransition:detailVC animationDirection:AnimationDirectionRight type:NO superNavi:self.navigationController];
+}
+
+#pragma mark -- 返回
+- (void)backToLastViewController {
+    [self popToViewControllerWithDirection:AnimationDirectionLeft type:NO superNavi:self.navigationController];
+}
+
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

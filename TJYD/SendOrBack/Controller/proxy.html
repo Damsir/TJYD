@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" style="display: block;width: 100%;height: 100%;padding: 0;margin: 0;overflow: visible">
+<head>
+    <meta charset="UTF-8">
+    <title>proxy</title>
+    <style type="text/css">
+        #adivceForm body{
+            background-color: #fff !important;
+        }
+    </style>
+</head>
+<body style="display: block;width: 100%;height: 100%;padding: 0;margin: 0;overflow: visible;">
+<iframe id="wholeForm" style="display: none;"></iframe>
+<iframe id="adviceForm" style="display: block;width: 100%;height: 100%;padding: 0;margin: 0;border: none;"></iframe>
+<script src="./jquery-1.10.2.min.js"></script>
+<script>
+    var wholeForm = document.getElementById('wholeForm');
+    var wholeFormWindow = wholeForm.contentWindow;
+
+    var adviceForm = document.getElementById('adviceForm');
+    var adviceFormWindow = adviceForm.contentWindow;
+
+    function setStage(stage) {
+        Dist.getStage(JSON.stringify({stage: stage}));
+    }
+
+    window.addEventListener('load', function () {
+        setStage('外层页面加载完毕');
+        window.webkit.messageHandlers.Dist.postMessage('外层页面加载完毕');
+    }, false);
+
+    function loadWholeForm(url) {
+        wholeForm.src = url;
+    }
+
+    function loadAdviceForm(url) {
+        adviceForm.src = url;
+    }
+
+    wholeForm.addEventListener('load', function () {
+        setStage('完整表单加载完毕');
+        window.webkit.messageHandlers.Dist.postMessage('完整表单加载完毕');
+    }, false);
+
+    adviceForm.addEventListener('load', function () {
+        setStage('意见表单加载完毕');
+        window.webkit.messageHandlers.Dist.postMessage('意见表单加载完毕');
+    }, false);
+
+    function removeForm() {
+        wholeForm.src = '';
+        adviceForm.src = '';
+    }
+
+    /***************** 给BPM发消息 *******************/
+
+    function postMsg(win, messageType) {
+        try {
+            win.postMessage('{"type":"' + messageType + '"}', '*');
+            console.log('发出' + messageType + '消息');
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    function saveAdviceForm() {
+        postMsg(adviceFormWindow, 'saveAdviceForm');
+        setStage('保存意见表单消息已发出');
+    }
+
+    function saveForm() {
+        postMsg(wholeFormWindow, 'saveForm');
+        setStage('保存完整表单消息已发出');
+    }
+
+    function validateAdviceForm() {
+        postMsg(adviceFormWindow, 'validateAdviceForm');
+        setStage('验证意见表单消息已发出');
+    }
+
+    function sendAdviceForm() {
+        postMsg(adviceFormWindow, 'sendAdviceForm');
+        setStage('结束移动端界面');
+    }
+
+    function closeAdviceForm() {
+        postMsg(wholeFormWindow, 'closeAdviceForm');
+        setStage('发送完整表单消息已发出');
+    }
+
+    function AdviceUpdatePage() {
+        postMsg(wholeFormWindow, 'AdviceUpdatePage');
+        setStage('刷新表单消息已发出');
+    }
+
+    /**************** 监听BPM传来的消息 ********************/
+
+    function addMessageListener(messageType, callback) {
+        window.addEventListener("message", function (res) {
+            try {
+                if (messageType === 'onCompleted' && res.data.indexOf("\"name\":\"onCompleted\"") !== -1) {
+                    callback(res.data);
+                } else {
+                    var data = eval('('+ res.data + ')');
+                    if (data.type === messageType || data.name === messageType) {
+                        callback(data);
+                    }
+                }
+            } catch (e) {
+                console.log('message error : ' + messageType);
+            }
+        }, false);
+    }
+
+    addMessageListener('saveAdviceSuccess', onSaveAdviceSuccess);
+    addMessageListener('validateResult', onValidateAdviceForm);
+    addMessageListener('onCompleted', onSendComplete);
+
+    addMessageListener('saveBchtty', saveBchtty);
+    addMessageListener('saveYzbgh', saveYzbgh);
+
+    function onSaveAdviceSuccess() {
+        setStage('意见表单保存成功');
+        AdviceUpdatePage();
+    }
+
+    function onValidateAdviceForm(data) {
+        if (data.result === '' || data.result === "true") {
+            setStage('意见表单验证通过');
+        }
+    }
+
+    function onSendComplete() {
+        setStage('发送成功');
+    }
+
+    function saveBchtty(data) {
+        setStage('收到补充合同终审环节消息');
+        $.ajax({
+            url: "/AppCenter/account/changeSupplyContract.do?xmxxId=" + data.xmxx_Id + "&bchtxxId=" + data.data,
+            type: "POST",
+            success: function () {
+                alert('补充合同终审环节数据保存请求已发出');
+                setStage('补充合同终审环节数据保存成功');
+            },
+            error: function (err) {
+                alert('补充合同终审环节数据保存失败');
+                alert(JSON.stringify(err));
+            }
+        });
+        alert('收到补充合同终审环节消息');
+    }
+    
+    function saveYzbgh(data) {
+        setStage('收到院长办公会意见环节消息');
+        $.ajax({
+            url: "http://116.236.160.182:9083/AppCenter/tongjiProcess/initWtProjectCwtz.do?xmxxId=" + data.xmxx_Id,
+            type: "GET",
+            success: function () {
+                alert('院长办公会意见数据保存成功');
+                setStage('院长办公会意见数据保存成功');
+            },
+            error: function (err) {
+                alert('院长办公会意见数据保存失败');
+                alert(data.xmxxid);
+                alert(JSON.stringify(err));
+            }
+        });
+        alert('收到院长办公会意见环节消息');
+    }
+
+</script>
+</body>
+</html>
